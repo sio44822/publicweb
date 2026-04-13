@@ -5,7 +5,7 @@ const ejs = require('ejs');
 const routes = require('./routes');
 
 const app = express();
-const PORT = process.env.PORT || 80;
+const PORT = process.env.PORT || 55005;
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
