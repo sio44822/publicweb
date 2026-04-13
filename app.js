@@ -20,6 +20,6 @@ app.listen(PORT, () => {
     ? `http://localhost:${PORT}` 
     : process.env.PUBLIC_URL || 'https://your-domain.com';
   
-  console.log(`Server running on ${URLBASE}`);
+  console.log(`Server running on port ${PORT} ${URLBASE}`);
   console.log(`Mode: ${isDev ? 'Development (nodemon)' : 'Production'}`);
 });
