@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>優惠卷記錄系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        input:focus {
+            border-color: #2563eb;
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .redeem-btn, .edit-btn {
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .coupon-row:hover .redeem-btn,
+        .coupon-row:hover .edit-btn {
+            opacity: 1;
+        }
+        @media (max-width: 640px) {
+            .redeem-btn, .edit-btn {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen py-4 px-3 md:py-12">
+
+    <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl overflow-hidden relative border border-gray-100">
+        
+        <div class="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-6 md:p-10 text-white relative">
+        </div>
+
+        <div class="p-4 md:p-6 space-y-4">
+            <div class="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-200 rounded-xl p-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-amber-600 font-bold uppercase">總金額</p>
+                        <p class="text-3xl md:text-4xl font-black text-amber-600">$<span id="totalAmount">0</span></p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs text-amber-600 font-bold uppercase">未核銷</p>
+                        <p class="text-xl md:text-2xl font-black text-amber-600">$<span id="activeAmount">0</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="appSummary" class="hidden flex flex-wrap gap-2">
+            </div>
+
+            <button id="toggleAddBtn" class="w-full flex items-center justify-center gap-2 py-3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold rounded-xl transition-all">
+                <span>+ 新增APP</span>
+            </button>
+
+            <div id="addAppSection" class="hidden flex items-center gap-2">
+                <input type="text" id="newAppName" class="flex-grow px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl text-base" placeholder="APP名稱">
+                <button id="addAppConfirmBtn" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl">新增</button>
+            </div>
+
+            <div id="appContainer" class="space-y-4">
+            </div>
+
+            <div id="emptyState" class="text-center py-8">
+                <div class="text-5xl mb-3">🎫</div>
+                <p class="text-gray-400 font-medium">尚無記錄</p>
+                <p class="text-gray-300 text-sm mt-1">點擊上方按鈕新增APP</p>
+            </div>
+        </div>
+
+        <div id="toast" class="hidden fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl shadow-xl z-[300] font-bold text-white transition-all scale-0 opacity-0"></div>
+    </div>
+
+    <div id="editModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-[400] p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-xs">
+            <h3 class="text-xl font-black mb-4">修改金額</h3>
+            <select id="editAmount" class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl text-lg mb-4">
+                <option value="0">$0</option>
+                <option value="10">$10</option>
+                <option value="20">$20</option>
+                <option value="50">$50</option>
+                <option value="100">$100</option>
+                <option value="200">$200</option>
+            </select>
+            <div class="flex gap-2">
+                <button id="saveEditBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl">儲存</button>
+                <button id="cancelEditBtn" class="px-5 bg-gray-200 hover:bg-gray-300 text-gray-600 font-bold py-3 rounded-xl">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const MAX_COUPONS = 3;
+        const COUPON_VALUES = [0, 10, 20, 50, 100, 200];
+
+        let appData = {};
+        let editTarget = null;
+
+        function loadData() {
+            const cookies = document.cookie.split('; ');
+            let data = {};
+            cookies.forEach(c => {
+                const [k, ...v] = c.split('=');
+                if (k === 'couponData') {
+                    try { data = JSON.parse(decodeURIComponent(v.join('='))); } catch(e) {}
+                }
+            });
+            console.log('Loaded:', appData);
+            appData = data;
+            render();
+        }
+
+        function saveData() {
+            const expires = new Date();
+            expires.setFullYear(expires.getFullYear() + 1);
+            document.cookie = `couponData=${encodeURIComponent(JSON.stringify(appData))};expires=${expires.toUTCString()};path=/`;
+        }
+
+        function getTotal() {
+            let total = 0, active = 0;
+            Object.values(appData).forEach(app => {
+                app.coupons.forEach(c => {
+                    if (!c.used) active += c.amount;
+                    total += c.amount;
+                });
+            });
+            return { total, active };
+        }
+
+        function render() {
+            const container = document.getElementById('appContainer');
+            const empty = document.getElementById('emptyState');
+            const summaryDiv = document.getElementById('appSummary');
+            const { total, active } = getTotal();
+
+            document.getElementById('totalAmount').innerText = total;
+            document.getElementById('activeAmount').innerText = active;
+
+            if (Object.keys(appData).length === 0) {
+                container.classList.add('hidden');
+                empty.classList.remove('hidden');
+                summaryDiv.classList.add('hidden');
+                return;
+            }
+
+            container.classList.remove('hidden');
+            empty.classList.add('hidden');
+            summaryDiv.classList.remove('hidden');
+
+            let summaryHtml = '';
+            Object.keys(appData).forEach(key => {
+                const app = appData[key];
+                const appTotal = app.coupons.reduce((sum, c) => sum + c.amount, 0);
+                const appMax = appTotal * 3;
+                summaryHtml += `<span class="px-3 py-1 bg-blue-100 text-blue-700 font-bold text-xs rounded-full">${key}: $${appTotal} → <span class="text-blue-900">$${appMax}</span></span>`;
+            });
+            summaryDiv.innerHTML = summaryHtml;
+
+            container.innerHTML = '';
+
+            Object.keys(appData).forEach((appName, idx) => {
+                const app = appData[appName];
+                const activeCoupons = app.coupons.filter(c => !c.used);
+
+                let rows = '';
+                app.coupons.forEach((c, cidx) => {
+                    const displayAmount = c.amount === 0 ? '-' : '$' + c.amount;
+                    const editOpts = !c.used ? COUPON_VALUES.map(v => `<option value="${v}" ${c.amount === v ? 'selected' : ''}>$${v}</option>`).join('') : '';
+                    const editSelect = !c.used ? `<select onchange="quickEdit('${appName}', ${cidx}, this.value)" class="w-16 text-xs border rounded px-1">${editOpts}</select>` : '';
+                    const redeemBtn = !c.used ? `<button onclick="redeemCoupon('${appName}', ${cidx})" class="text-green-500 hover:text-green-700 p-1" title="核銷">✓</button>` : '<span class="text-gray-300">✗</span>';
+                    rows += `
+                        <tr class="coupon-row border-b border-gray-50">
+                            <td class="py-2 px-1 text-center font-bold ${c.used ? 'text-gray-300 line-through' : 'text-gray-800'}">${editSelect || displayAmount}</td>
+                            <td class="py-2 px-1 text-center">${redeemBtn}</td>
+                        </tr>
+                    `;
+                });
+
+                const options = COUPON_VALUES.map(v => `<option value="${v}">$${v}</option>`).join('');
+                const usedAny = app.coupons.some(c => c.used);
+                const canAddNew = activeCoupons.length < MAX_COUPONS && !usedAny;
+                
+                const appCard = document.createElement('div');
+                appCard.className = 'bg-white border-2 border-gray-100 rounded-xl overflow-hidden w-[70%] max-w-xs mx-auto';
+                appCard.innerHTML = `
+                    <div onclick="toggleApp('${appName}')" class="bg-gray-50 px-3 py-2 flex items-center justify-between border-b border-gray-100 cursor-pointer">
+                        <h3 class="text-base font-bold text-gray-800 truncate">${appName}</h3>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold ${activeCoupons.length > 0 ? 'text-blue-600' : 'text-gray-400'}">${activeCoupons.length}/${MAX_COUPONS}</span>
+                            <button onclick="event.stopPropagation();deleteApp('${appName}')" class="text-red-400 hover:text-red-600 text-xs">✕</button>
+                        </div>
+                    </div>
+                    <div id="app-${appName}" class="p-2">
+                        <table class="w-full text-xs">
+                            <tbody>${rows}</tbody>
+                        </table>
+                        ${canAddNew ? `
+                            <div class="mt-2 flex items-center gap-1">
+                                <select id="amt-${idx}" class="flex-1 px-2 py-1 bg-gray-50 border rounded text-xs">
+                                    ${options}
+                                </select>
+                                <button onclick="addCoupon('${appName}', ${idx})" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded text-xs">+</button>
+                            </div>
+                        ` : usedAny ? `
+                            <div class="mt-2 text-center text-red-400 text-xs">已核銷無法新增</div>
+                        ` : `
+                            <div class="mt-2 text-center text-gray-400 text-xs">已達上限</div>
+                        `}
+                        <button onclick="clearCoupons('${appName}')" class="mt-2 w-full text-xs text-gray-400 hover:text-red-400 py-1">清除優惠卷</button>
+                    </div>
+                `;
+                container.appendChild(appCard);
+            });
+        }
+
+        function addCoupon(appName, idx) {
+            const app = appData[appName];
+            const activeCount = app.coupons.filter(c => !c.used).length;
+            if (activeCount >= MAX_COUPONS) return;
+            if (app.coupons.some(c => c.used)) return showToast('已核銷無法新增', 'error');
+            const select = document.getElementById('amt-' + idx);
+            const amount = parseInt(select?.value || '10', 10);
+            app.coupons.push({ amount, used: false });
+            saveData();
+            render();
+            showToast('已新增', 'success');
+        }
+
+        function quickEdit(appName, cidx, value) {
+            appData[appName].coupons[cidx].amount = parseInt(value, 10);
+            saveData();
+            showToast('已修改', 'success');
+        }
+
+        function redeemCoupon(appName, cidx) {
+            const app = appData[appName];
+            app.coupons[cidx].used = true;
+            saveData();
+            render();
+            showToast('已核銷', 'success');
+        }
+
+        function clearCoupons(appName) {
+            if (!confirm('清除所有優惠卷？')) return;
+            appData[appName].coupons = [];
+            saveData();
+            render();
+            showToast('已清除', 'success');
+        }
+
+        function toggleApp(appName) {
+            const el = document.getElementById('app-' + appName);
+            el.classList.toggle('hidden');
+        }
+
+        function openEditModal(appName, cidx) {
+            editTarget = { appName, cidx };
+            const coupon = appData[appName].coupons[cidx];
+            document.getElementById('editAmount').value = coupon.amount;
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        document.getElementById('saveEditBtn').onclick = () => {
+            if (!editTarget) return;
+            const amount = parseInt(document.getElementById('editAmount').value, 10);
+            appData[editTarget.appName].coupons[editTarget.cidx].amount = amount;
+            saveData();
+            document.getElementById('editModal').classList.add('hidden');
+            editTarget = null;
+            render();
+            showToast('已修改', 'success');
+        };
+
+        document.getElementById('cancelEditBtn').onclick = () => {
+            document.getElementById('editModal').classList.add('hidden');
+            editTarget = null;
+        };
+
+        function deleteApp(appName) {
+            if (!confirm(`刪除 ${appName}？`)) return;
+            delete appData[appName];
+            saveData();
+            render();
+            showToast('已刪除', 'success');
+        }
+
+        document.getElementById('toggleAddBtn').onclick = () => {
+            const section = document.getElementById('addAppSection');
+            section.classList.toggle('hidden');
+            if (!section.classList.contains('hidden')) {
+                document.getElementById('newAppName').focus();
+            }
+        };
+
+        document.getElementById('addAppConfirmBtn').onclick = () => {
+            const name = document.getElementById('newAppName').value.trim();
+            if (!name) return showToast('請輸入名稱', 'error');
+            if (appData[name]) return showToast('已存在', 'error');
+            appData[name] = { coupons: [] };
+            document.getElementById('newAppName').value = '';
+            document.getElementById('addAppSection').classList.add('hidden');
+            saveData();
+            render();
+            showToast('已新增', 'success');
+        };
+
+        document.getElementById('newAppName').onkeypress = (e) => {
+            if (e.key === 'Enter') document.getElementById('addAppConfirmBtn').click();
+        };
+
+        function showToast(msg, type) {
+            const toast = document.getElementById('toast');
+            const colors = { success: 'bg-green-600', error: 'bg-red-600' };
+            toast.innerText = msg;
+            toast.className = `fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl shadow-xl z-[300] font-bold text-white transition-all scale-100 opacity-100 ${colors[type]}`;
+            setTimeout(() => {
+                toast.classList.replace('scale-100', 'scale-0');
+                toast.classList.replace('opacity-100', 'opacity-0');
+            }, 2000);
+        }
+
+        window.onload = loadData;
+    </script>
+</body>
+</html>
