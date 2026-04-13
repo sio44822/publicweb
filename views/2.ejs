@@ -71,6 +71,10 @@
             <div id="appContainer" class="space-y-4">
             </div>
 
+            <button id="clearAllBtn" class="hidden w-full py-3 bg-red-50 hover:bg-red-100 text-red-500 font-bold rounded-xl transition-all">
+                清除所有優惠卷
+            </button>
+
             <div id="emptyState" class="text-center py-8">
                 <div class="text-5xl mb-3">🎫</div>
                 <p class="text-gray-400 font-medium">尚無記錄</p>
@@ -156,6 +160,7 @@
             container.classList.remove('hidden');
             empty.classList.add('hidden');
             summaryDiv.classList.remove('hidden');
+            document.getElementById('clearAllBtn').classList.remove('hidden');
 
             let summaryHtml = '';
             Object.keys(appData).forEach(key => {
@@ -177,7 +182,7 @@
                     const displayAmount = c.amount === 0 ? '-' : '$' + c.amount;
                     const editOpts = !c.used ? COUPON_VALUES.map(v => `<option value="${v}" ${c.amount === v ? 'selected' : ''}>$${v}</option>`).join('') : '';
                     const editSelect = !c.used ? `<select onchange="quickEdit('${appName}', ${cidx}, this.value)" class="w-16 text-xs border rounded px-1">${editOpts}</select>` : '';
-                    const redeemBtn = !c.used ? `<button onclick="redeemCoupon('${appName}', ${cidx})" class="text-green-500 hover:text-green-700 p-1" title="核銷">✓</button>` : '<span class="text-gray-300">✗</span>';
+                    const redeemBtn = !c.used ? `<button onclick="redeemCoupon('${appName}', ${cidx})" class="text-green-500 hover:text-green-700 p-1" title="核銷">✓</button>` : `<button onclick="redeemCoupon('${appName}', ${cidx})" class="text-orange-500 hover:text-orange-700 p-1 text-xs" title="還原">還原</button>`;
                     rows += `
                         <tr class="coupon-row border-b border-gray-50">
                             <td class="py-2 px-1 text-center font-bold ${c.used ? 'text-gray-300 line-through' : 'text-gray-800'}">${editSelect || displayAmount}</td>
@@ -211,12 +216,7 @@
                                 </select>
                                 <button onclick="addCoupon('${appName}', ${idx})" class="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded text-xs">+</button>
                             </div>
-                        ` : usedAny ? `
-                            <div class="mt-2 text-center text-red-400 text-xs">已核銷無法新增</div>
-                        ` : `
-                            <div class="mt-2 text-center text-gray-400 text-xs">已達上限</div>
-                        `}
-                        <button onclick="clearCoupons('${appName}')" class="mt-2 w-full text-xs text-gray-400 hover:text-red-400 py-1">清除優惠卷</button>
+                        ` : ''}
                     </div>
                 `;
                 container.appendChild(appCard);
@@ -227,7 +227,6 @@
             const app = appData[appName];
             const activeCount = app.coupons.filter(c => !c.used).length;
             if (activeCount >= MAX_COUPONS) return;
-            if (app.coupons.some(c => c.used)) return showToast('已核銷無法新增', 'error');
             const select = document.getElementById('amt-' + idx);
             const amount = parseInt(select?.value || '10', 10);
             app.coupons.push({ amount, used: false });
@@ -244,10 +243,16 @@
 
         function redeemCoupon(appName, cidx) {
             const app = appData[appName];
-            app.coupons[cidx].used = true;
+            const coupon = app.coupons[cidx];
+            if (coupon.used) {
+                coupon.used = false;
+                showToast('已恢復', 'success');
+            } else {
+                coupon.used = true;
+                showToast('已核銷', 'success');
+            }
             saveData();
             render();
-            showToast('已核銷', 'success');
         }
 
         function clearCoupons(appName) {
@@ -256,6 +261,14 @@
             saveData();
             render();
             showToast('已清除', 'success');
+        }
+
+        function clearAllCoupons() {
+            if (!confirm('清除所有APP的優惠卷？')) return;
+            Object.keys(appData).forEach(k => appData[k].coupons = []);
+            saveData();
+            render();
+            showToast('已全部清除', 'success');
         }
 
         function toggleApp(appName) {
@@ -317,6 +330,8 @@
         document.getElementById('newAppName').onkeypress = (e) => {
             if (e.key === 'Enter') document.getElementById('addAppConfirmBtn').click();
         };
+
+        document.getElementById('clearAllBtn').onclick = clearAllCoupons;
 
         function showToast(msg, type) {
             const toast = document.getElementById('toast');
