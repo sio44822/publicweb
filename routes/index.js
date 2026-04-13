@@ -21,8 +21,8 @@ router.get('/public/1', (req, res) => {
   res.render('1');
 });
 
-router.get('/public/2', (req, res) => {
-  res.render('2');
+router.get('/public/coupon', (req, res) => {
+  res.render('coupon');
 });
 
 router.get('/public/11.html', (req, res) => {
