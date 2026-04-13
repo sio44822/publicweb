@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>課程預約系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .slot-card.selected {
+            border-color: #2563eb;
+            background-color: #eff6ff;
+            box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.2);
+            transform: translateY(-2px);
+        }
+        .slot-card.full {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: #f3f4f6;
+            border-color: #e5e7eb;
+            pointer-events: none;
+        }
+        
+        input:focus {
+            border-color: #2563eb;
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 鎖定狀態樣式 */
+        .loading-overlay {
+            pointer-events: none;
+            opacity: 0.5;
+            filter: grayscale(0.5);
+            transition: all 0.3s ease;
+        }
+
+        @media (max-width: 640px) {
+            .slot-card {
+                padding: 1.25rem 0.5rem !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen py-6 px-4 md:py-12">
+
+    <div class="max-w-4xl mx-auto bg-white rounded-[2rem] shadow-2xl overflow-hidden relative border border-gray-100">
+        
+        <!-- 頂部標題 -->
+        <div class="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-8 md:p-12 text-white relative">
+            <div class="relative z-10">
+                <h1 class="text-3xl md:text-5xl font-black tracking-tight" id="mainTitle">服務預約系統</h1>
+                <p class="mt-4 text-blue-100 text-lg font-light opacity-90">請填寫資料並選擇心儀的課程時段</p>
+            </div>
+            <div class="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+        </div>
+
+        <!-- 預約表單 -->
+        <form id="bookingForm" class="p-6 md:p-10 space-y-12">
+            
+            <!-- 1. 基本資料 (移至第一步) -->
+            <section class="space-y-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold shadow-lg shadow-blue-200">1</div>
+                    <h2 class="text-2xl font-bold text-gray-800">填寫聯絡資料</h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="group">
+                        <label class="block text-xs font-black text-gray-400 mb-2 ml-1 uppercase tracking-widest">您的姓名</label>
+                        <input type="text" id="userName" name="name" required class="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl transition-all focus:bg-white text-base font-medium" placeholder="請輸入姓名">
+                    </div>
+                    <div class="group">
+                        <label class="block text-xs font-black text-gray-400 mb-2 ml-1 uppercase tracking-widest">聯絡電話</label>
+                        <input type="tel" id="userPhone" name="phone" required class="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl transition-all focus:bg-white text-base font-medium" placeholder="請輸入電話" inputmode="numeric">
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. 課程列表 (移至第二步，增加同步鎖定) -->
+            <section id="courseSection" class="space-y-8 loading-overlay">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold shadow-lg shadow-blue-200">2</div>
+                        <h2 class="text-2xl font-bold text-gray-800">選擇課程與時段</h2>
+                    </div>
+                    <span id="syncStatus" class="text-[10px] font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full animate-pulse border border-amber-100">正在讀取最新名額...</span>
+                </div>
+                
+                <div id="courseContainer" class="space-y-6">
+                    <!-- 課程卡片由 JS 動態生成 -->
+                </div>
+            </section>
+
+            <div class="pt-4">
+                <button type="submit" id="userSubmitBtn" disabled class="w-full bg-slate-400 text-white font-black py-5 rounded-2xl shadow-xl transition-all active:scale-[0.98] text-xl tracking-widest flex items-center justify-center gap-3 cursor-not-allowed">
+                    <span>等待資料同步中...</span>
+                </button>
+            </div>
+        </form>
+
+        <!-- 提交完成區塊 -->
+        <div id="successSection" class="hidden p-12 md:p-20 text-center space-y-8 fade-in">
+            <div class="flex justify-center">
+                <div class="w-24 h-24 bg-green-500 text-white rounded-3xl flex items-center justify-center text-5xl shadow-2xl rotate-3">
+                    ✓
+                </div>
+            </div>
+            <div class="space-y-3">
+                <h2 class="text-4xl font-black text-gray-900">預約已送出！</h2>
+                <p class="text-gray-500 text-lg">系統已將您的資訊成功同步至雲端。</p>
+            </div>
+            <div class="bg-blue-50 p-4 rounded-[2rem] border border-blue-100 inline-block text-left mx-auto max-w-sm w-full shadow-inner">
+                <p class="text-[10px] text-blue-400 font-black uppercase mb-3 tracking-[0.2em]">預約明細確認</p>
+                <div class="space-y-2 text-blue-900">
+                    <p class="font-bold flex justify-between"><span>姓名：</span><span id="summaryName"></span></p>
+                    <p class="font-bold flex justify-between"><span>項目：</span><span id="summaryCourse"></span></p>
+                </div>
+            </div>
+            <div class="pt-6">
+                <button onclick="location.reload()" class="bg-gray-900 hover:bg-black text-white px-12 py-5 rounded-2xl font-black text-lg transition-all shadow-xl active:scale-95">
+                    返回列表 / 再次預約
+                </button>
+            </div>
+        </div>
+
+        <!-- 訊息彈窗 -->
+        <div id="toast" class="hidden fixed top-6 left-1/2 -translate-x-1/2 px-8 py-4 rounded-2xl shadow-2xl z-[300] font-bold text-white transition-all scale-0 opacity-0"></div>
+    </div>
+
+    <script>
+        let URLBASE = '';
+        let SCRIPT_URL = '';
+        let appData, selectedChoice, isSyncing;
+        const MAX_SEATS = 3;
+
+        async function loadConfig() {
+            try {
+                const res = await fetch('/config');
+                const data = await res.json();
+                URLBASE = data.URLBASE;
+                SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyYMAW1pdigBwM6xlbuD9kJvnVMLWyt2rPcT0Mh9_Z_s8hnopvqJkh-D7znlmOUKf7f/exec";
+                console.log('URLBASE:', URLBASE);
+                console.log('Mode:', data.mode);
+                initApp();
+            } catch (err) {
+                console.error('Failed to load config:', err);
+            }
+        }
+
+        function initApp() {
+            appData = {
+                'A': {
+                    name: '蛋糕課',
+                    image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&q=80',
+                    desc: '本課程專為初學者設計，從零開始講解核心理論與基本操作。',
+                    slots: [ { time: '9:00', booked: 0 }, { time: '13:00', booked: 0 }, { time: '15:00', booked: 0 } ]
+                },
+                'B': {
+                    name: '剪紙課',
+                    image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=400&q=80',
+                    desc: '強調手把手實操體驗，包含多項實際案例演練。',
+                    slots: [ { time: '9:00', booked: 0 }, { time: '13:00', booked: 0 }, { time: '15:00', booked: 0 } ]
+                },
+                'C': {
+                    name: '2月1日-手作課',
+                    image: 'https://fastly.picsum.photos/id/29/4000/2670.jpg?hmac=rCbRAl24FzrSzwlR5tL-Aqzyu5tX_PA95VJtnUXegGU',
+                    desc: '邀請領域權威進行主題演講與經驗傳承。',
+                    slots: [ { time: '9:00', booked: 0 }, { time: '13:00', booked: 0 }, { time: '15:00', booked: 0 } ]
+                }
+            };
+
+            selectedChoice = null;
+            isSyncing = true;
+
+            render();
+            syncSeats();
+        }
+
+        async function syncSeats() {
+            if (!SCRIPT_URL) return;
+            isSyncing = true;
+            try {
+                const response = await fetch(`${SCRIPT_URL}?action=getStats&t=${Date.now()}`);
+                const stats = await response.json(); 
+                console.log(stats)
+                Object.keys(appData).forEach(cid => {
+                    appData[cid].slots.forEach(slot => {
+                        const key = `${appData[cid].name}-${slot.time}`;
+                        console.log(key)
+                        if (stats[key] !== undefined) {
+                            slot.booked = parseInt(stats[key], 10);
+                            console.log(slot)
+                        }
+                    });
+                });
+                
+                isSyncing = false;
+                document.getElementById('courseSection').classList.remove('loading-overlay');
+                document.getElementById('syncStatus').innerText = "名額已同步至最新";
+                document.getElementById('syncStatus').className = "text-[10px] font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100";
+                
+                const btn = document.getElementById('userSubmitBtn');
+                btn.disabled = false;
+                btn.className = "w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-5 rounded-2xl shadow-xl shadow-blue-100 transition-all active:scale-[0.98] text-xl tracking-widest flex items-center justify-center gap-3";
+                btn.innerHTML = `<span>確認預約</span><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>`;
+                
+                render();
+            } catch (err) {
+                console.error("同步失敗:", err);
+                document.getElementById('syncStatus').innerText = "名額更新失敗，請檢查網路";
+                document.getElementById('syncStatus').className = "text-[10px] font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-100";
+                render();
+            }
+        }
+
+        function render() {
+            const container = document.getElementById('courseContainer');
+            container.innerHTML = '';
+
+            Object.entries(appData).forEach(([cid, data]) => {
+                const card = document.createElement('div');
+                card.className = 'bg-white border-2 border-gray-50 rounded-[1.5rem] overflow-hidden shadow-sm p-4 md:p-6';
+                
+                let slotsGrid = '';
+                data.slots.forEach((s, idx) => {
+                    const full = s.booked >= MAX_SEATS;
+                    slotsGrid += `
+                        <div onclick="pickSlot('${cid}', ${idx}, this)" 
+                             class="slot-card border-2 rounded-2xl py-4 px-2 cursor-pointer text-center transition-all active:scale-95 flex flex-col justify-center items-center ${full ? 'full' : 'border-gray-100 hover:border-blue-300 hover:bg-blue-50/50'}">
+                            <div class="text-base font-black text-gray-800">${s.time}</div>
+                            <div class="text-[10px] font-bold mt-1 ${full ? 'text-red-500' : 'text-blue-500'}">
+                                ${full ? '名額已滿' : `剩餘 ${MAX_SEATS - s.booked} 位`}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                card.innerHTML = `
+                    <div class="flex flex-col sm:flex-row gap-6">
+                        <div class="w-full sm:w-28 flex-shrink-0">
+                            <div class="aspect-square bg-slate-100 rounded-2xl overflow-hidden border border-gray-100 shadow-inner">
+                                <img src="${data.image}" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/300x300?text=Course'">
+                            </div>
+                        </div>
+                        <div class="flex-grow">
+                            <h3 class="text-xl font-black text-gray-800 mb-1">${data.name}</h3>
+                            <p class="text-gray-400 text-xs mb-4 line-clamp-2">${data.desc}</p>
+                            <div class="grid grid-cols-3 gap-3">
+                                ${slotsGrid}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function pickSlot(cid, idx, el) {
+            if (isSyncing || appData[cid].slots[idx].booked >= MAX_SEATS) return;
+            document.querySelectorAll('.slot-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedChoice = { 
+                courseName: appData[cid].name, 
+                time: appData[cid].slots[idx].time,
+                cid, 
+                idx 
+            };
+        }
+
+        document.getElementById('bookingForm').onsubmit = async (e) => {
+            e.preventDefault();
+            if (isSyncing) return showToast("⌛ 請等待名額同步完成", "error");
+
+            const name = document.getElementById('userName').value.trim();
+            const phone = document.getElementById('userPhone').value.trim();
+
+            if (!name || !phone) return showToast("⚠️ 請填寫聯絡資料", "error");
+            if (!selectedChoice) return showToast("🎯 請選擇預約課程", "error");
+
+            const btn = document.getElementById('userSubmitBtn');
+            btn.disabled = true;
+            btn.innerHTML = `<span>傳送預約中...</span>`;
+
+            const params = new URLSearchParams();
+            params.append('姓名', name);
+            params.append('電話', phone);
+            params.append('課程', selectedChoice.courseName);
+            params.append('時段', selectedChoice.time);
+            params.append('提交時間', new Date().toLocaleString());
+
+            try {
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: params,
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+                });
+
+                document.getElementById('summaryName').innerText = name;
+                document.getElementById('summaryCourse').innerText = `${selectedChoice.courseName} (${selectedChoice.time})`;
+                document.getElementById('bookingForm').classList.add('hidden');
+                document.getElementById('successSection').classList.remove('hidden');
+                showToast("✅ 預約提交成功！", "success");
+            } catch (err) {
+                showToast("❌ 提交失敗，請重新嘗試", "error");
+                btn.disabled = false;
+                btn.innerText = "確認預約";
+            }
+        };
+
+        function showToast(msg, type) {
+            const toast = document.getElementById('toast');
+            const colors = { success: 'bg-green-600', error: 'bg-red-600' };
+            toast.innerText = msg;
+            toast.className = `fixed top-6 left-1/2 -translate-x-1/2 px-8 py-4 rounded-2xl shadow-2xl z-[300] font-black text-white transition-all scale-100 opacity-100 ${colors[type]}`;
+            setTimeout(() => {
+                toast.classList.replace('scale-100', 'scale-0');
+                toast.classList.replace('opacity-100', 'opacity-0');
+            }, 3000);
+        }
+
+        window.onload = loadConfig;
+    </script>
+        const MAX_SEATS = 3;
+
+        let appData = {
+            'A': {
+                name: '蛋糕課',
+                image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&q=80',
+                desc: '本課程專為初學者設計，從零開始講解核心理論與基本操作。',
+                slots: [ { time: '9:00', booked: 0 }, { time: '13:00', booked: 0 }, { time: '15:00', booked: 0 } ]
+            },
+            'B': {
+                name: '剪紙課',
+                image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=400&q=80',
+                desc: '強調手把手實操體驗，包含多項實際案例演練。',
+                slots: [ { time: '9:00', booked: 0 }, { time: '13:00', booked: 0 }, { time: '15:00', booked: 0 } ]
+            },
+            'C': {
+                name: '2月1日-手作課',
+                image: 'https://fastly.picsum.photos/id/29/4000/2670.jpg?hmac=rCbRAl24FzrSzwlR5tL-Aqzyu5tX_PA95VJtnUXegGU',
+                desc: '邀請領域權威進行主題演講與經驗傳承。',
+                slots: [ { time: '9:00', booked: 0 }, { time: '13:00', booked: 0 }, { time: '15:00', booked: 0 } ]
+            }
+        };
+
+        let selectedChoice = null;
+        let isSyncing = true;
+
+        // 同步名額並解鎖介面
+        async function syncSeats() {
+            if (!SCRIPT_URL) return;
+            isSyncing = true;
+            try {
+                const response = await fetch(`${SCRIPT_URL}?action=getStats&t=${Date.now()}`);
+                const stats = await response.json(); 
+                console.log(stats)
+                Object.keys(appData).forEach(cid => {
+                    appData[cid].slots.forEach(slot => {
+                        const key = `${appData[cid].name}-${slot.time}`;
+                        console.log(key)
+                        if (stats[key] !== undefined) {
+                            slot.booked = parseInt(stats[key], 10);
+                            console.log(slot)
+                        }
+                    });
+                });
+                
+                // 解鎖介面
+                isSyncing = false;
+                document.getElementById('courseSection').classList.remove('loading-overlay');
+                document.getElementById('syncStatus').innerText = "名額已同步至最新";
+                document.getElementById('syncStatus').className = "text-[10px] font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full border border-green-100";
+                
+                const btn = document.getElementById('userSubmitBtn');
+                btn.disabled = false;
+                btn.className = "w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-5 rounded-2xl shadow-xl shadow-blue-100 transition-all active:scale-[0.98] text-xl tracking-widest flex items-center justify-center gap-3";
+                btn.innerHTML = `<span>確認預約</span><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>`;
+                
+                render();
+            } catch (err) {
+                console.error("同步失敗:", err);
+                document.getElementById('syncStatus').innerText = "名額更新失敗，請檢查網路";
+                document.getElementById('syncStatus').className = "text-[10px] font-bold text-red-600 bg-red-50 px-3 py-1 rounded-full border border-red-100";
+                render();
+            }
+        }
+
+        function render() {
+            const container = document.getElementById('courseContainer');
+            container.innerHTML = '';
+
+            Object.entries(appData).forEach(([cid, data]) => {
+                const card = document.createElement('div');
+                card.className = 'bg-white border-2 border-gray-50 rounded-[1.5rem] overflow-hidden shadow-sm p-4 md:p-6';
+                
+                let slotsGrid = '';
+                data.slots.forEach((s, idx) => {
+                    const full = s.booked >= MAX_SEATS;
+                    slotsGrid += `
+                        <div onclick="pickSlot('${cid}', ${idx}, this)" 
+                             class="slot-card border-2 rounded-2xl py-4 px-2 cursor-pointer text-center transition-all active:scale-95 flex flex-col justify-center items-center ${full ? 'full' : 'border-gray-100 hover:border-blue-300 hover:bg-blue-50/50'}">
+                            <div class="text-base font-black text-gray-800">${s.time}</div>
+                            <div class="text-[10px] font-bold mt-1 ${full ? 'text-red-500' : 'text-blue-500'}">
+                                ${full ? '名額已滿' : `剩餘 ${MAX_SEATS - s.booked} 位`}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                card.innerHTML = `
+                    <div class="flex flex-col sm:flex-row gap-6">
+                        <div class="w-full sm:w-28 flex-shrink-0">
+                            <div class="aspect-square bg-slate-100 rounded-2xl overflow-hidden border border-gray-100 shadow-inner">
+                                <img src="${data.image}" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/300x300?text=Course'">
+                            </div>
+                        </div>
+                        <div class="flex-grow">
+                            <h3 class="text-xl font-black text-gray-800 mb-1">${data.name}</h3>
+                            <p class="text-gray-400 text-xs mb-4 line-clamp-2">${data.desc}</p>
+                            <div class="grid grid-cols-3 gap-3">
+                                ${slotsGrid}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function pickSlot(cid, idx, el) {
+            if (isSyncing || appData[cid].slots[idx].booked >= MAX_SEATS) return;
+            document.querySelectorAll('.slot-card').forEach(c => c.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedChoice = { 
+                courseName: appData[cid].name, 
+                time: appData[cid].slots[idx].time,
+                cid, 
+                idx 
+            };
+        }
+
+        document.getElementById('bookingForm').onsubmit = async (e) => {
+            e.preventDefault();
+            if (isSyncing) return showToast("⌛ 請等待名額同步完成", "error");
+
+            const name = document.getElementById('userName').value.trim();
+            const phone = document.getElementById('userPhone').value.trim();
+
+            if (!name || !phone) return showToast("⚠️ 請填寫聯絡資料", "error");
+            if (!selectedChoice) return showToast("🎯 請選擇預約課程", "error");
+
+            const btn = document.getElementById('userSubmitBtn');
+            btn.disabled = true;
+            btn.innerHTML = `<span>傳送預約中...</span>`;
+
+            const params = new URLSearchParams();
+            params.append('姓名', name);
+            params.append('電話', phone);
+            params.append('課程', selectedChoice.courseName);
+            params.append('時段', selectedChoice.time);
+            params.append('提交時間', new Date().toLocaleString());
+
+            try {
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    body: params,
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+                });
+
+                document.getElementById('summaryName').innerText = name;
+                document.getElementById('summaryCourse').innerText = `${selectedChoice.courseName} (${selectedChoice.time})`;
+                document.getElementById('bookingForm').classList.add('hidden');
+                document.getElementById('successSection').classList.remove('hidden');
+                showToast("✅ 預約提交成功！", "success");
+            } catch (err) {
+                showToast("❌ 提交失敗，請重新嘗試", "error");
+                btn.disabled = false;
+                btn.innerText = "確認預約";
+            }
+        };
+
+        function showToast(msg, type) {
+            const toast = document.getElementById('toast');
+            const colors = { success: 'bg-green-600', error: 'bg-red-600' };
+            toast.innerText = msg;
+            toast.className = `fixed top-6 left-1/2 -translate-x-1/2 px-8 py-4 rounded-2xl shadow-2xl z-[300] font-black text-white transition-all scale-100 opacity-100 ${colors[type]}`;
+            setTimeout(() => {
+                toast.classList.replace('scale-100', 'scale-0');
+                toast.classList.replace('opacity-100', 'opacity-0');
+            }, 3000);
+        }
+
+        window.onload = () => {
+            render();
+            syncSeats();
+        };
+    </script>
+</body>
+</html>
