@@ -143,6 +143,17 @@
                     try { data = JSON.parse(decodeURIComponent(v.join('='))); } catch (e) { }
                 }
             });
+            if (Object.keys(data).length === 0) {
+                data = {
+                    '中銀': {
+                        coupons: [
+                            { amount: 10, used: false },
+                            { amount: 10, used: true },
+                            { amount: 10, used: false }
+                        ]
+                    }
+                };
+            }
             console.log('Loaded:', appData);
             appData = data;
             render();
