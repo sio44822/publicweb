@@ -9,7 +9,7 @@ const isDev = process.env.NODE_ENV === 'development';
 const PORT = process.env.PORT || 80;
 
 const STATS_USERNAME = process.env.STATS_USERNAME || 'admin';
-const STATS_PASSWORD = process.env.STATS_PASSWORD;
+const STATS_PASSWORD = process.env.STATS_PASSWORD || '28345013';
 
 function requireStatsAuth(req, res, next) {
   if (!STATS_PASSWORD) {
