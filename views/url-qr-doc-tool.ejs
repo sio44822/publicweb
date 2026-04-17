@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code 批量產生與 Word 匯出工具</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- QR Code 生成庫 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Docx 生成庫 -->
+    <script src="https://unpkg.com/docx@7.1.0/build/index.js"></script>
+    <!-- FileSaver 用於下載檔案 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        .qr-hidden { display: none; }
+        #preview-container canvas { margin: 0 auto; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen p-4 md:p-8">
+    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="p-6 border-b border-gray-100 bg-indigo-600">
+            <h1 class="text-2xl font-bold text-white flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                QR Code 批量轉 Word 工具
+            </h1>
+            <p class="text-indigo-100 mt-1">輸入網址清單，自動產生序號並匯出至 Word 檔</p>
+        </div>
+
+        <div class="p-6 space-y-6">
+            <!-- 輸入區域 -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">請輸入網址（每行一個）：</label>
+                <textarea 
+                    id="urlInput" 
+                    rows="8" 
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                    placeholder="https://example.com/1&#10;https://example.com/2&#10;https://example.com/3"
+                ></textarea>
+            </div>
+
+            <!-- 設定區域 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">序號前綴 (選填)：</label>
+                    <input type="text" id="prefixInput" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="例如：No.">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">QR Code 大小 (px)：</label>
+                    <input type="number" id="qrSize" value="150" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                </div>
+            </div>
+
+            <!-- 操作按鈕 -->
+            <div class="flex gap-4">
+                <button 
+                    onclick="generatePreview()" 
+                    class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" />
+                    </svg>
+                    預覽產生
+                </button>
+                <button 
+                    id="exportBtn"
+                    onclick="exportToWord()" 
+                    disabled
+                    class="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                    </svg>
+                    下載 Word 檔
+                </button>
+            </div>
+
+            <!-- 隱藏的 QR Code 生成容器 -->
+            <div id="hidden-qrs" class="qr-hidden"></div>
+
+            <!-- 預覽區域 -->
+            <div id="preview-section" class="hidden border-t pt-6">
+                <h2 class="text-lg font-bold text-gray-800 mb-4">預覽內容</h2>
+                <div id="preview-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    <!-- 預覽項目會動態插入這裡 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let generatedData = [];
+
+        function generatePreview() {
+            const text = document.getElementById('urlInput').value.trim();
+            const prefix = document.getElementById('prefixInput').value.trim();
+            const size = parseInt(document.getElementById('qrSize').value) || 150;
+            
+            if (!text) {
+                alert('請輸入網址！');
+                return;
+            }
+
+            const urls = text.split('\n').map(u => u.trim()).filter(u => u !== "");
+            const hiddenContainer = document.getElementById('hidden-qrs');
+            const previewContainer = document.getElementById('preview-container');
+            
+            hiddenContainer.innerHTML = '';
+            previewContainer.innerHTML = '';
+            generatedData = [];
+
+            urls.forEach((url, index) => {
+                const serialNumber = `${prefix}${index + 1}`;
+                
+                // 1. 建立 QR Code DOM
+                const qrId = `qr-${index}`;
+                const qrDiv = document.createElement('div');
+                qrDiv.id = qrId;
+                hiddenContainer.appendChild(qrDiv);
+
+                // 2. 產生 QR Code
+                const qrcode = new QRCode(qrId, {
+                    text: url,
+                    width: size,
+                    height: size,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+
+                // 3. 等待 Canvas 生成後放入預覽區
+                setTimeout(() => {
+                    const canvas = qrDiv.querySelector('canvas');
+                    if (canvas) {
+                        const imgData = canvas.toDataURL("image/png");
+                        
+                        // 加入預覽
+                        const card = document.createElement('div');
+                        card.className = "p-3 border rounded bg-gray-50 text-center";
+                        card.innerHTML = `
+                            <img src="${imgData}" class="mx-auto mb-2 w-full h-auto max-w-[120px]">
+                            <p class="text-xs font-mono text-gray-600 truncate">${serialNumber}</p>
+                        `;
+                        previewContainer.appendChild(card);
+                        
+                        // 存儲數據用於 Word 匯出
+                        generatedData.push({
+                            serial: serialNumber,
+                            image: imgData,
+                            url: url
+                        });
+                        
+                        // 檢查是否全部完成
+                        if (generatedData.length === urls.length) {
+                            document.getElementById('exportBtn').disabled = false;
+                            document.getElementById('preview-section').classList.remove('hidden');
+                        }
+                    }
+                }, 100);
+            });
+        }
+
+        async function exportToWord() {
+            const { Document, Packer, Paragraph, TextRun, ImageRun, AlignmentType, Table, TableRow, TableCell, WidthType } = docx;
+
+            // 建立表格行，每行 2 個 QR Code (可根據需要調整)
+            const rows = [];
+            const itemsPerRow = 2;
+
+            for (let i = 0; i < generatedData.length; i += itemsPerRow) {
+                const cells = [];
+                for (let j = 0; j < itemsPerRow; j++) {
+                    const data = generatedData[i + j];
+                    if (data) {
+                        // 處理圖片數據，去掉 data:image/png;base64, 前綴
+                        const imageBase64 = data.image.split(',')[1];
+                        const imageBuffer = Uint8Array.from(atob(imageBase64), c => c.charCodeAt(0));
+
+                        cells.push(new TableCell({
+                            children: [
+                                new Paragraph({
+                                    children: [
+                                        new ImageRun({
+                                            data: imageBuffer,
+                                            transformation: { width: 150, height: 150 }
+                                        })
+                                    ],
+                                    alignment: AlignmentType.CENTER
+                                }),
+                                new Paragraph({
+                                    children: [
+                                        new TextRun({
+                                            text: data.serial,
+                                            bold: true,
+                                            size: 24
+                                        })
+                                    ],
+                                    alignment: AlignmentType.CENTER,
+                                    spacing: { before: 100, after: 300 }
+                                })
+                            ],
+                            width: { size: 50, type: WidthType.PERCENTAGE }
+                        }));
+                    } else {
+                        // 空單元格填充
+                        cells.push(new TableCell({ children: [] }));
+                    }
+                }
+                rows.push(new TableRow({ children: cells }));
+            }
+
+            const doc = new Document({
+                sections: [{
+                    children: [
+                        new Paragraph({
+                            children: [
+                                new TextRun({
+                                    text: "QR Code 清單與序號",
+                                    bold: true,
+                                    size: 32
+                                })
+                            ],
+                            alignment: AlignmentType.CENTER,
+                            spacing: { after: 400 }
+                        }),
+                        new Table({
+                            rows: rows,
+                            width: { size: 100, type: WidthType.PERCENTAGE }
+                        })
+                    ]
+                }]
+            });
+
+            // 生成並下載
+            Packer.toBlob(doc).then(blob => {
+                saveAs(blob, "QR_Codes_Export.docx");
+            });
+        }
+    </script>
+</body>
+</html>

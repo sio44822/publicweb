@@ -25,6 +25,10 @@ router.get('/public/coupon', (req, res) => {
   res.render('coupon');
 });
 
+router.get('/public/url-qr-doc-tool', (req, res) => {
+  res.render('url-qr-doc-tool');
+});
+
 router.get('/public/11.html', (req, res) => {
   res.render('1');
 });
