@@ -34,16 +34,7 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-5 text-white shadow-lg">
-                <div class="text-emerald-100 text-sm font-medium mb-1">今日訪客</div>
-                <div class="text-4xl font-bold" id="todayUsers">-</div>
-            </div>
-            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-5 text-white shadow-lg">
-                <div class="text-blue-100 text-sm font-medium mb-1">今日訪問次數</div>
-                <div class="text-4xl font-bold" id="todayVisits">-</div>
-            </div>
-        </div>
+        
 
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 mb-6">
             <div class="px-5 py-4 border-b border-slate-100 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
@@ -136,18 +127,9 @@
         async function loadData() {
             await loadPageList();
             await loadPageTodayStats();
-            const [todayRes, dailyRes, recordsRes] = await Promise.all([
-                apiFetch('/api/statistics/today'),
-                apiFetch('/api/statistics/daily'),
-                apiFetch('/api/statistics')
-            ]);
-
-            const today = await todayRes.json();
-            const daily = await dailyRes.json();
+            const recordsRes = await apiFetch('/api/statistics');
             allRecords = await recordsRes.json();
 
-            document.getElementById('todayUsers').textContent = today.userCount || 0;
-            document.getElementById('todayVisits').textContent = today.visitCount || 0;
             document.getElementById('totalRecords').textContent = `共 ${allRecords.length} 筆`;
 
             renderRecords(allRecords);
