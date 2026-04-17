@@ -6,7 +6,7 @@ const statistics = require('../utils/statistics');
 const router = express.Router();
 
 const isDev = process.env.NODE_ENV === 'development';
-const PORT = process.env.PORT || 55005;
+const PORT = process.env.PORT || 80;
 
 const STATS_USERNAME = process.env.STATS_USERNAME || 'admin';
 const STATS_PASSWORD = process.env.STATS_PASSWORD;
