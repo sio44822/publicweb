@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>訪問統計</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         .fade-in { animation: fadeIn 0.4s ease-out; }
@@ -15,6 +16,24 @@
     <div class="max-w-4xl mx-auto px-4">
         <h1 class="text-2xl font-bold text-slate-800 mb-6">訪問統計</h1>
         
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">
+            <div class="flex flex-wrap gap-4 items-center">
+                <div class="flex items-center gap-2">
+                    <label class="text-sm font-medium text-slate-700">網頁:</label>
+                    <select id="pageSelect" onchange="switchPage()" class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">全部網頁</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-slate-500">今日:</span>
+                    <span class="text-lg font-bold text-emerald-600" id="pageTodayUsers">-</span>
+                    <span class="text-xs text-slate-400">訪客</span>
+                    <span class="text-lg font-bold text-blue-600" id="pageTodayVisits">-</span>
+                    <span class="text-xs text-slate-400">次</span>
+                </div>
+            </div>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div class="bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl p-5 text-white shadow-lg">
                 <div class="text-emerald-100 text-sm font-medium mb-1">今日訪客</div>
@@ -27,20 +46,26 @@
         </div>
 
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 mb-6">
-            <div class="px-5 py-4 border-b border-slate-100">
-                <h2 class="font-semibold text-slate-700">每日統計</h2>
+            <div class="px-5 py-4 border-b border-slate-100 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="switchChart('hour')" id="btnHour" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-sm hover:bg-slate-200">時</button>
+                    <button onclick="switchChart('daily')" id="btnDaily" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">日</button>
+                    <button onclick="switchChart('weekly')" id="btnWeekly" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-sm hover:bg-slate-200">週</button>
+                    <button onclick="switchChart('monthly')" id="btnMonthly" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-sm hover:bg-slate-200">月</button>
+                </div>
+                <div class="flex flex-wrap gap-2" id="filterControls">
+                    <input type="date" id="filterDate" class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select id="filterWeek" class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hidden">
+                        <option value="">選擇週</option>
+                    </select>
+                    <select id="filterMonth" class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hidden">
+                        <option value="">選擇月</option>
+                    </select>
+                    <button onclick="applyChartFilter()" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">篩選</button>
+                </div>
             </div>
             <div class="p-4">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="text-slate-500 border-b border-slate-100">
-                            <th class="text-left py-2 font-medium">日期</th>
-                            <th class="text-right py-2 font-medium">訪客數</th>
-                            <th class="text-right py-2 font-medium">訪問次數</th>
-                        </tr>
-                    </thead>
-                    <tbody id="dailyTable"></tbody>
-                </table>
+                <canvas id="trendChart"></canvas>
             </div>
         </div>
 
@@ -51,7 +76,7 @@
                     <span class="text-xs text-slate-400" id="totalRecords"></span>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <input type="date" id="filterDate" class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <input type="date" id="recordFilterDate" class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <input type="text" id="filterUser" placeholder="搜尋使用者ID" class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-40">
                     <button onclick="applyFilters()" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">篩選</button>
                     <button onclick="clearFilters()" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-sm hover:bg-slate-200">清除</button>
@@ -62,6 +87,7 @@
                     <thead>
                         <tr class="text-slate-500 border-b border-slate-100 bg-slate-50">
                             <th class="text-left py-3 px-4 font-medium">時間</th>
+                            <th class="text-left py-3 px-4 font-medium">網頁</th>
                             <th class="text-left py-3 px-4 font-medium">使用者ID</th>
                         </tr>
                     </thead>
@@ -73,12 +99,47 @@
 
     <script>
         let allRecords = [];
+        let trendChart = null;
+        let currentPage = '';
+        const STATS_AUTH = 'Basic ' + btoa('admin:28345013');
+
+        async function apiFetch(url) {
+            return fetch(url, { headers: { 'Authorization': STATS_AUTH } });
+        }
+
+        async function loadPageList() {
+            const res = await apiFetch('/api/statistics/pages');
+            const pages = await res.json();
+            const select = document.getElementById('pageSelect');
+            select.innerHTML = '<option value="">全部網頁</option>';
+            Object.keys(pages).forEach(page => {
+                const label = page || '/';
+                select.innerHTML += `<option value="${page}">${label}</option>`;
+            });
+        }
+
+        async function loadPageTodayStats() {
+            const page = currentPage;
+            const url = page ? `/api/statistics/page/today?page=${encodeURIComponent(page)}` : '/api/statistics/today';
+            const res = await apiFetch(url);
+            const stats = await res.json();
+            document.getElementById('pageTodayUsers').textContent = stats.userCount || 0;
+            document.getElementById('pageTodayVisits').textContent = stats.visitCount || 0;
+        }
+
+        async function switchPage() {
+            currentPage = document.getElementById('pageSelect').value;
+            await loadPageTodayStats();
+            await loadChartData(currentPeriod);
+        }
 
         async function loadData() {
+            await loadPageList();
+            await loadPageTodayStats();
             const [todayRes, dailyRes, recordsRes] = await Promise.all([
-                fetch('/api/statistics/today'),
-                fetch('/api/statistics/daily'),
-                fetch('/api/statistics')
+                apiFetch('/api/statistics/today'),
+                apiFetch('/api/statistics/daily'),
+                apiFetch('/api/statistics')
             ]);
 
             const today = await todayRes.json();
@@ -89,30 +150,287 @@
             document.getElementById('todayVisits').textContent = today.visitCount || 0;
             document.getElementById('totalRecords').textContent = `共 ${allRecords.length} 筆`;
 
-            const dailyRows = Object.entries(daily).sort((a, b) => b[0].localeCompare(a[0]));
-            document.getElementById('dailyTable').innerHTML = dailyRows.map(([date, data]) => `
-                <tr class="border-b border-slate-50 hover:bg-slate-50">
-                    <td class="py-2 text-slate-700">${date}</td>
-                    <td class="py-2 text-right text-slate-600">${data.userCount}</td>
-                    <td class="py-2 text-right text-slate-600">${data.visitCount}</td>
-                </tr>
-            `).join('');
-
             renderRecords(allRecords);
+            await switchChart('daily');
         }
+
+        async function switchChart(period) {
+            currentPeriod = period;
+            updateFilterControls(period);
+            await loadChartData(period);
+        }
+
+        function updateFilterControls(period) {
+            const dateInput = document.getElementById('filterDate');
+            const weekSelect = document.getElementById('filterWeek');
+            const monthSelect = document.getElementById('filterMonth');
+
+            dateInput.classList.add('hidden');
+            weekSelect.classList.add('hidden');
+            monthSelect.classList.add('hidden');
+
+            if (period === 'hour') {
+                dateInput.classList.remove('hidden');
+                dateInput.type = 'date';
+                dateInput.value = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().split('T')[0];
+            } else if (period === 'daily') {
+                dateInput.classList.remove('hidden');
+                dateInput.type = 'date';
+            } else if (period === 'weekly') {
+                weekSelect.classList.remove('hidden');
+                populateWeekSelect();
+            } else if (period === 'monthly') {
+                monthSelect.classList.remove('hidden');
+                populateMonthSelect();
+            }
+
+            document.querySelectorAll('#btnHour, #btnDaily, #btnWeekly, #btnMonthly').forEach(btn => {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-slate-100', 'text-slate-600');
+            });
+            document.getElementById('btn' + period.charAt(0).toUpperCase() + period.slice(1)).classList.remove('bg-slate-100', 'text-slate-600');
+            document.getElementById('btn' + period.charAt(0).toUpperCase() + period.slice(1)).classList.add('bg-blue-600', 'text-white');
+        }
+
+        function populateWeekSelect() {
+            const select = document.getElementById('filterWeek');
+            select.innerHTML = '<option value="">選擇週</option>';
+            const now = new Date(Date.now() + 8 * 60 * 60 * 1000);
+            for (let i = 0; i < 52; i++) {
+                const date = new Date(now);
+                date.setDate(date.getDate() - i * 7);
+                const year = date.getFullYear();
+                const jan1 = new Date(year, 0, 1);
+                const daysToFirstWeek = (jan1.getDay() + 6) % 7;
+                const firstWeekStart = new Date(jan1);
+                firstWeekStart.setDate(jan1.getDate() - daysToFirstWeek);
+                let week = 1;
+                let current = new Date(firstWeekStart);
+                while (current < date) {
+                    current.setDate(current.getDate() + 7);
+                    week++;
+                }
+                if (week > 0) {
+                    select.innerHTML += `<option value="${year}-${week}">${year} 第${week}週</option>`;
+                }
+            }
+        }
+
+        function populateMonthSelect() {
+            const select = document.getElementById('filterMonth');
+            select.innerHTML = '<option value="">選擇月</option>';
+            const now = new Date(Date.now() + 8 * 60 * 60 * 1000);
+            for (let i = 0; i < 12; i++) {
+                const date = new Date(now);
+                date.setMonth(date.getMonth() - i);
+                select.innerHTML += `<option value="${date.getFullYear()}-${date.getMonth() + 1}">${date.getFullYear()}年${date.getMonth() + 1}月</option>`;
+            }
+        }
+
+        async function applyChartFilter() {
+            await loadChartData(currentPeriod);
+            updateFilteredRecords();
+        }
+
+        function getFilteredDateRange() {
+            const period = currentPeriod;
+            const filterDate = document.getElementById('filterDate').value;
+            const filterWeek = document.getElementById('filterWeek').value;
+            const filterMonth = document.getElementById('filterMonth').value;
+
+            if (period === 'hour' && filterDate) {
+                return { start: filterDate, end: filterDate };
+            } else if (period === 'daily' && filterDate) {
+                return { start: filterDate, end: filterDate };
+            } else if (period === 'weekly' && filterWeek) {
+                const [year, week] = filterWeek.split('-');
+                const jan1 = new Date(parseInt(year), 0, 1);
+                const daysToFirstWeek = jan1.getDay();
+                const firstWeekStart = new Date(jan1);
+                firstWeekStart.setDate(jan1.getDate() - daysToFirstWeek + 1);
+                const weekStart = new Date(firstWeekStart);
+                weekStart.setDate(firstWeekStart.getDate() + (parseInt(week) - 1) * 7);
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekEnd.getDate() + 6);
+                const startStr = `${weekStart.getUTCFullYear()}-${String(weekStart.getUTCMonth() + 1).padStart(2, '0')}-${String(weekStart.getUTCDate()).padStart(2, '0')}`;
+                const endStr = `${weekEnd.getUTCFullYear()}-${String(weekEnd.getUTCMonth() + 1).padStart(2, '0')}-${String(weekEnd.getUTCDate()).padStart(2, '0')}`;
+                return { start: startStr, end: endStr };
+            } else if (period === 'monthly' && filterMonth) {
+                const [year, month] = filterMonth.split('-');
+                const startStr = `${year}-${String(month).padStart(2, '0')}-01`;
+                const endDate = new Date(parseInt(year), parseInt(month), 0);
+                const endStr = `${year}-${String(month).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+                return { start: startStr, end: endStr };
+            }
+            return null;
+        }
+
+        function updateFilteredRecords() {
+            const range = getFilteredDateRange();
+            let filtered = allRecords;
+            
+            if (range) {
+                filtered = filtered.filter(r => {
+                    const recordDate = r.time.split('T')[0];
+                    return recordDate >= range.start && recordDate <= range.end;
+                });
+            }
+            
+            if (currentPage) {
+                filtered = filtered.filter(r => r.pagePath === currentPage);
+            }
+            
+            renderRecords(filtered);
+        }
+
+        async function loadChartData(period) {
+            let url, chartLabels, data;
+            const filterDate = document.getElementById('filterDate').value;
+            const filterWeek = document.getElementById('filterWeek').value;
+            const filterMonth = document.getElementById('filterMonth').value;
+            const pageParam = currentPage ? `&page=${encodeURIComponent(currentPage)}` : '';
+
+            try {
+                if (period === 'hour') {
+                    url = '/api/statistics/trend/hour?hours=24' + pageParam;
+                    const res = await apiFetch(url);
+                    data = await res.json();
+                    chartLabels = data.map(d => `${d.date.slice(5)} ${d.hour}:00`);
+                } else if (period === 'daily') {
+                    if (filterDate) {
+                        url = `/api/statistics/filter/daily?date=${filterDate}` + pageParam;
+                        const res = await apiFetch(url);
+                        data = await res.json();
+                        chartLabels = data.hourly ? data.hourly.map(d => `${d.hour}:00`) : [];
+                    } else {
+                        url = '/api/statistics/trend/daily?days=7' + pageParam;
+                        const res = await apiFetch(url);
+                        data = await res.json();
+                        chartLabels = data.map(d => d.date.slice(5));
+                    }
+                } else if (period === 'weekly') {
+                    if (filterWeek) {
+                        const [year, week] = filterWeek.split('-');
+                        url = `/api/statistics/filter/weekly?year=${year}&week=${week}`;
+                        const res = await apiFetch(url);
+                        data = await res.json();
+                        chartLabels = data.daily ? data.daily.map(d => d.date.slice(5)) : [];
+                    } else {
+                        url = '/api/statistics/trend/weekly';
+                        const res = await apiFetch(url);
+                        data = await res.json();
+                        chartLabels = data.map(d => d.week);
+                    }
+                } else if (period === 'monthly') {
+                    if (filterMonth) {
+                        const [year, month] = filterMonth.split('-');
+                        url = `/api/statistics/filter/monthly?year=${year}&month=${month}`;
+                        const res = await apiFetch(url);
+                        data = await res.json();
+                        chartLabels = data.daily ? data.daily.map(d => d.date.slice(5)) : [];
+                    } else {
+                        url = '/api/statistics/trend/monthly';
+                        const res = await apiFetch(url);
+                        data = await res.json();
+                        chartLabels = data.map(d => d.month);
+                    }
+                }
+            } catch (e) {
+                console.error('loadChartData error:', e);
+                return;
+            }
+
+            let userData, visitData;
+
+            if (period === 'hour' && data && Array.isArray(data)) {
+                userData = data.map(d => d.users);
+                visitData = data.map(d => d.visits);
+            } else if (period === 'daily' && filterDate && data && data.hourly) {
+                userData = data.hourly.map(d => d.users);
+                visitData = data.hourly.map(d => d.visits);
+            } else if (period === 'daily' && data && Array.isArray(data)) {
+                userData = data.map(d => d.users);
+                visitData = data.map(d => d.visits);
+            } else if (period === 'weekly' && filterWeek && data && data.daily) {
+                userData = data.daily.map(d => d.users);
+                visitData = data.daily.map(d => d.visits);
+            } else if (period === 'weekly' && data && Array.isArray(data)) {
+                userData = data.map(d => d.users);
+                visitData = data.map(d => d.visits);
+            } else if (period === 'monthly' && filterMonth && data && data.daily) {
+                userData = data.daily.map(d => d.users);
+                visitData = data.daily.map(d => d.visits);
+            } else if (period === 'monthly' && data && Array.isArray(data)) {
+                userData = data.map(d => d.users);
+                visitData = data.map(d => d.visits);
+            } else {
+                console.error('No data to display:', { period, filterDate, filterWeek, filterMonth, data });
+                return;
+            }
+
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            
+            if (trendChart) {
+                trendChart.destroy();
+            }
+
+            trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartLabels,
+                    datasets: [
+                        {
+                            label: '訪客數',
+                            data: userData,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        },
+                        {
+                            label: '訪問次數',
+                            data: visitData,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.3,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        let currentPeriod = 'daily';
 
         function renderRecords(records) {
             document.getElementById('totalRecords').textContent = `共 ${records.length} 筆`;
             document.getElementById('recordsTable').innerHTML = records.map(r => `
                 <tr class="border-b border-slate-50 hover:bg-slate-50 fade-in">
                     <td class="py-2 px-4 text-slate-600 whitespace-nowrap">${r.time.replace('T', ' ').substring(0, 19)}</td>
+                    <td class="py-2 px-4 text-slate-800 font-mono text-xs">${r.pagePath || '/'}</td>
                     <td class="py-2 px-4 text-slate-800 font-mono text-xs" title="${r.userId}">${r.userId}</td>
                 </tr>
             `).join('');
         }
 
         function applyFilters() {
-            const filterDate = document.getElementById('filterDate').value;
+            const filterDate = document.getElementById('recordFilterDate').value;
             const filterUser = document.getElementById('filterUser').value.toLowerCase();
 
             let filtered = allRecords;
@@ -129,7 +447,7 @@
         }
 
         function clearFilters() {
-            document.getElementById('filterDate').value = '';
+            document.getElementById('recordFilterDate').value = '';
             document.getElementById('filterUser').value = '';
             renderRecords(allRecords);
         }
