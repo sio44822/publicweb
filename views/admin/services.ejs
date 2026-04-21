@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>服務管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .fade-in {
+            animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen py-8 px-4">
+
+    <div id="loginPanel" class="max-w-sm mx-auto mt-20">
+        <div class="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
+            <h1 class="text-xl font-bold text-gray-800 mb-4">管理員登入</h1>
+            <input type="password" id="adminPass" 
+                class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl text-base mb-4 focus:bg-white focus:border-gray-300"
+                placeholder="請輸入管理密碼">
+            <button onclick="doLogin()" 
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl">
+                登入
+            </button>
+            <p id="loginError" class="text-red-500 text-sm mt-3 hidden"></p>
+        </div>
+    </div>
+
+    <div id="mainPanel" class="max-w-2xl mx-auto hidden">
+        <header class="flex items-center justify-between mb-8 fade-in">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">服務管理</h1>
+                <p class="mt-1 text-gray-400 text-sm">管理服務顯示與排序</p>
+            </div>
+            <div class="flex gap-3">
+                <a href="/services" class="text-gray-400 hover:text-gray-600 text-sm">返回服務</a>
+                <button onclick="doLogout()" class="text-gray-400 hover:text-gray-600 text-sm">登出</button>
+            </div>
+        </header>
+
+        <div id="servicesList" class="space-y-3">
+        </div>
+
+        <div id="toast" class="hidden fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl shadow-xl z-[300] font-bold text-white transition-all scale-0 opacity-0">
+        </div>
+    </div>
+
+    <div id="editModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-[400] p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-xl font-bold mb-4">編輯服務</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">名稱</label>
+                    <input type="text" id="editName" class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">說明</label>
+                    <input type="text" id="editDesc" class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">連結</label>
+                    <input type="text" id="editUrl" class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">圖示</label>
+                    <input type="text" id="editIcon" class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl">
+                </div>
+            </div>
+            <div class="flex gap-2 mt-6">
+                <button onclick="saveEdit()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl">儲存</button>
+                <button onclick="closeEditModal()" class="px-5 bg-gray-200 hover:bg-gray-300 text-gray-600 font-bold py-3 rounded-xl">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let servicesData = <%- JSON.stringify(services) %>;
+        let editingId = null;
+
+        function doLogin() {
+            const pass = document.getElementById('adminPass').value;
+            fetch('/api/services/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pass })
+            }).then(res => {
+                if (res.ok) {
+                    document.getElementById('loginPanel').classList.add('hidden');
+                    document.getElementById('mainPanel').classList.remove('hidden');
+                    render();
+                } else {
+                    document.getElementById('loginError').textContent = '密碼錯誤';
+                    document.getElementById('loginError').classList.remove('hidden');
+                }
+            });
+        }
+
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/services/login', { method: 'GET' });
+                if (res.ok) {
+                    document.getElementById('loginPanel').classList.add('hidden');
+                    document.getElementById('mainPanel').classList.remove('hidden');
+                    render();
+                }
+            } catch (e) {}
+        }
+
+        function doLogout() {
+            fetch('/api/services/logout', { method: 'POST' });
+            document.getElementById('loginPanel').classList.remove('hidden');
+            document.getElementById('mainPanel').classList.add('hidden');
+            document.getElementById('adminPass').value = '';
+        }
+
+        function render() {
+            const list = document.getElementById('servicesList');
+            list.innerHTML = '';
+            
+            const sorted = [...servicesData].sort((a, b) => a.order - b.order);
+            
+            sorted.forEach((svc, i) => {
+                const row = document.createElement('div');
+                row.className = 'bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-4 fade-in';
+                row.style.animationDelay = `${i * 60}ms`;
+                
+                row.innerHTML = `
+                    <div class="text-2xl">${svc.icon || '📁'}</div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="font-bold text-gray-800">${svc.name}</h3>
+                        <p class="text-sm text-gray-400">${svc.description || ''}</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="moveOrder('${svc.id}', -1)" class="p-2 text-gray-400 hover:text-gray-600" ${i === 0 ? 'disabled' : ''}>↑</button>
+                        <button onclick="moveOrder('${svc.id}', 1)" class="p-2 text-gray-400 hover:text-gray-600" ${i === sorted.length - 1 ? 'disabled' : ''}>↓</button>
+                        <button onclick="openEditModal('${svc.id}')" class="p-2 text-gray-400 hover:text-gray-600">✎</button>
+                        <button onclick="toggleEnabled('${svc.id}')" class="px-3 py-1 rounded-full text-sm font-bold ${svc.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">
+                            ${svc.enabled ? '啟用' : '停用'}
+                        </button>
+                    </div>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        async function moveOrder(id, delta) {
+            const sorted = [...servicesData].sort((a, b) => a.order - b.order);
+            const idx = sorted.findIndex(s => s.id === id);
+            if (idx === -1) return;
+            
+            const newOrder = sorted[idx].order + delta;
+            const swapIdx = sorted.findIndex(s => s.order === newOrder);
+            
+            if (swapIdx !== -1) {
+                sorted[swapIdx].order = sorted[idx].order;
+            }
+            sorted[idx].order = newOrder;
+            
+            servicesData = sorted;
+            await saveAndReload();
+        }
+
+        async function toggleEnabled(id) {
+            const svc = servicesData.find(s => s.id === id);
+            if (!svc) return;
+            svc.enabled = !svc.enabled;
+            servicesData = servicesData;
+            await saveAndReload();
+        }
+
+        function openEditModal(id) {
+            const svc = servicesData.find(s => s.id === id);
+            if (!svc) return;
+            editingId = id;
+            document.getElementById('editName').value = svc.name || '';
+            document.getElementById('editDesc').value = svc.description || '';
+            document.getElementById('editUrl').value = svc.url || '';
+            document.getElementById('editIcon').value = svc.icon || '';
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.add('hidden');
+            editingId = null;
+        }
+
+        async function saveEdit() {
+            if (!editingId) return;
+            const svc = servicesData.find(s => s.id === editingId);
+            if (!svc) return;
+            svc.name = document.getElementById('editName').value;
+            svc.description = document.getElementById('editDesc').value;
+            svc.url = document.getElementById('editUrl').value;
+            svc.icon = document.getElementById('editIcon').value;
+            await saveAndReload();
+            closeEditModal();
+        }
+
+        async function saveAndReload() {
+            try {
+                await fetch('/api/services/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ services: servicesData })
+                });
+                showToast('已儲存', 'success');
+                render();
+            } catch (err) {
+                showToast('儲存失敗', 'error');
+            }
+        }
+
+        function showToast(msg, type) {
+            const toast = document.getElementById('toast');
+            const colors = { success: 'bg-green-600', error: 'bg-red-600' };
+            toast.innerText = msg;
+            toast.className = `fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl shadow-xl z-[300] font-bold text-white transition-all scale-100 opacity-100 ${colors[type]}`;
+            setTimeout(() => {
+                toast.classList.replace('scale-100', 'scale-0');
+                toast.classList.replace('opacity-100', 'opacity-0');
+            }, 2000);
+        }
+
+        checkAuth();
+    </script>
+</body>
+</html>

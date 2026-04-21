@@ -1,0 +1,52 @@
+{
+  "project": {
+    "name": "publicweb",
+    "description": "Express.js public web service with navigation layer",
+    "created": "2026-04-21",
+    "status": "active"
+  },
+  "gsd": {
+    "version": "1.0",
+    "workflow": "new-project"
+  },
+  "phases": {
+    "01-services-nav": {
+      "status": "pre-discussed",
+      "context": ".planning/phases/01-services-nav/01-CONTEXT.md",
+      "priority": "P0"
+    }
+  },
+  "stack": {
+    "runtime": "nodejs",
+    "framework": "express",
+    "template": "ejs",
+    "css": "tailwind"
+  },
+  "routes": {
+    "existing": [
+      "/public/1",
+      "/public/coupon",
+      "/public/url-qr-doc-tool",
+      "/",
+      "/config"
+    ],
+    "new": [
+      "/services/",
+      "/mgmt/services"
+    ]
+  },
+  "files": {
+    "artifacts": [
+      ".planning/PROJECT.md",
+      ".planning/REQUIREMENTS.md",
+      ".planning/ROADMAP.md",
+      ".planning/STATE.md",
+      ".planning/config.json"
+    ],
+    "to_create": [
+      "data/services.json",
+      "views/services.ejs",
+      "views/admin/services.ejs"
+    ]
+  }
+}

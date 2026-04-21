@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>服務導覽</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .service-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .service-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08);
+        }
+        .fade-in {
+            animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen py-8 px-4">
+
+    <div class="max-w-4xl mx-auto">
+        <header class="flex justify-between items-center mb-12 fade-in">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">服務導覽</h1>
+                <p class="mt-2 text-gray-400 text-sm">選擇您需要的服務</p>
+            </div>
+            <a href="/mgmt/services" class="text-gray-400 hover:text-gray-600 text-sm">管理</a>
+        </header>
+
+        <div id="servicesGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        </div>
+
+        <div id="emptyState" class="hidden text-center py-16 text-gray-400">
+            <p class="text-lg">目前沒有可用的服務</p>
+        </div>
+    </div>
+
+    <script>
+        async function loadServices() {
+            try {
+                const res = await fetch('/api/services');
+                const data = await res.json();
+                render(data);
+            } catch (err) {
+                console.error('載入失敗', err);
+            }
+        }
+
+        function render(services) {
+            const grid = document.getElementById('servicesGrid');
+            const empty = document.getElementById('emptyState');
+
+            if (!services || services.length === 0) {
+                grid.classList.add('hidden');
+                empty.classList.remove('hidden');
+                return;
+            }
+
+            grid.innerHTML = '';
+            services.forEach((svc, i) => {
+                const card = document.createElement('a');
+                card.href = svc.url;
+                card.className = 'service-card block bg-white rounded-2xl border border-gray-100 p-6 text-center no-underline fade-in';
+                card.style.animationDelay = `${i * 80}ms`;
+                card.innerHTML = `
+                    <div class="text-4xl mb-4">${svc.icon || '📁'}</div>
+                    <h2 class="text-lg font-bold text-gray-800 mb-1">${svc.name}</h2>
+                    <p class="text-sm text-gray-400">${svc.description || ''}</p>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        loadServices();
+    </script>
+</body>
+</html>
