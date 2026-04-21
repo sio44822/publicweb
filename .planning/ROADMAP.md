@@ -3,34 +3,24 @@
 ## Milestones
 
 - ✅ **v1.0 Services Navigation** — Phase 1 (shipped 2026-04-21)
-- 📋 **v1.1 Enhanced Admin** — Phase 2-3 (planned)
+- ✅ **v1.1 Enhanced Statistics** — (shipped 2026-04-22)
 
 ---
 
-## Phase 1: Services Navigation (COMPLETED)
+## v1.1 Enhanced Statistics (COMPLETED)
 
 <details>
-<summary>✅ v1.0 - SHIPPED 2026-04-21</summary>
+<summary>✅ v1.1 - SHIPPED 2026-04-22</summary>
 
-- Services: `/services/` (grid), `/mgmt/services` (admin)
-- Authentication: Cookie-based password protection
-- Validation: Name/URL required checks
-- Files: `data/services.json`, `utils/services-loader.js`, `views/services.ejs`, `views/admin/services.ejs`
+- KPI 儀表板: 今日/總瀏覽、訪客
+- 篩選器: 日期範圍 + 服務下拉
+- 趨勢圖: 時/日/週/月切換
+- 服務排名: 長條圖
+- 數據表格: 可排序/搜尋
+- CSV 匯出
 
 </details>
 
 ---
 
-## v1.1 Enhanced Admin (Backlog)
-
-### Phase 2: Service Configuration Persistence
-- JSON backup before writes
-- Config validation enhancement
-
-### Phase 3: Enhanced Admin Features
-- Service usage analytics per card
-- Bulk operations
-
----
-
-*Roadmap v1.0 shipped*
+*Roadmap v1.1 shipped*
