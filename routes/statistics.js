@@ -148,4 +148,93 @@ router.get('/api/statistics/filter/monthly', checkStatsAuth, (req, res) => {
   res.json(stats);
 });
 
+router.get('/api/statistics/kpi', checkStatsAuth, (req, res) => {
+  const stats = statistics.getStatistics();
+  const totalVisits = stats.length;
+  const uniqueUsers = new Set(stats.map(r => r.userId)).size;
+  
+  const pageCounts = {};
+  stats.forEach(r => {
+    const page = r.pagePath || '/';
+    pageCounts[page] = (pageCounts[page] || 0) + 1;
+  });
+  const sortedPages = Object.entries(pageCounts).sort((a, b) => b[1] - a[1]);
+  const topService = sortedPages[0] ? { page: sortedPages[0][0], count: sortedPages[0][1] } : null;
+  
+  const today = statistics.getTodayStats();
+  
+  res.json({
+    totalVisits,
+    totalUsers: uniqueUsers,
+    todayVisits: today.visitCount,
+    todayUsers: today.userCount,
+    topService
+  });
+});
+
+router.get('/api/statistics/chart', checkStatsAuth, (req, res) => {
+  const type = req.query.type || 'daily';
+  const page = req.query.page;
+  let data;
+  
+  if (type === 'hourly') {
+    data = statistics.getPageHourTrend(page, 24);
+  } else if (type === 'weekly') {
+    data = statistics.getWeekTrend();
+  } else if (type === 'monthly') {
+    data = statistics.getMonthTrend();
+  } else {
+    data = page ? statistics.getPageDailyTrend(page, 30) : statistics.getUserTrend(30);
+  }
+  res.json(data);
+});
+
+router.get('/api/statistics/service-stats', checkStatsAuth, (req, res) => {
+  const stats = statistics.getStatistics();
+  const pageData = {};
+  
+  stats.forEach(r => {
+    const page = r.pagePath || '/';
+    if (!pageData[page]) {
+      pageData[page] = { visits: 0, users: new Set() };
+    }
+    pageData[page].visits++;
+    pageData[page].users.add(r.userId);
+  });
+  
+  const result = Object.entries(pageData).map(([page, data]) => ({
+    page,
+    visits: data.visits,
+    users: data.users.size
+  })).sort((a, b) => b.visits - a.visits);
+  
+  res.json(result);
+});
+
+router.get('/api/statistics/export', checkStatsAuth, (req, res) => {
+  const stats = statistics.getStatistics();
+  const page = req.query.page;
+  const startDate = req.query.start;
+  const endDate = req.query.end;
+  
+  let filtered = stats;
+  if (page) {
+    filtered = filtered.filter(r => r.pagePath === page);
+  }
+  if (startDate) {
+    filtered = filtered.filter(r => r.time >= startDate);
+  }
+  if (endDate) {
+    filtered = filtered.filter(r => r.time <= endDate);
+  }
+  
+  const csv = ['時間,服務,訪客ID'].concat(
+    filtered.map(r => `${r.time},${r.pagePath || '/' },${r.userId}`)
+  ).join('\n');
+  
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', `attachment; filename=statistics-${new Date().toISOString().split('T')[0]}.csv`);
+  res.send(csv);
+});
+
 module.exports = router;

@@ -3,493 +3,379 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>訪問統計</title>
+    <title>流量統計</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         .fade-in { animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .kpi-card:hover { transform: translateY(-2px); }
     </style>
 </head>
-<body class="bg-slate-100 min-h-screen py-8">
-    <div id="loginPanel" class="max-w-md mx-auto mt-20">
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h1 class="text-xl font-bold text-slate-800 mb-4">管理員登入</h1>
-            <input type="text" id="loginUser" placeholder="帳號" class="w-full px-4 py-2 border border-slate-200 rounded-lg mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <input type="password" id="loginPass" placeholder="密碼" autocomplete="new-password" class="w-full px-4 py-2 border border-slate-200 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <button id="loginBtn" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">登入</button>
-            <p id="loginError" class="text-red-500 text-sm mt-2 hidden"></p>
+<body class="bg-slate-100 min-h-screen py-6 px-4">
+    
+    <div id="loginPanel" class="max-w-sm mx-auto mt-20 hidden">
+        <div class="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
+            <h1 class="text-2xl font-bold text-gray-800 mb-6">管理員登入</h1>
+            <input type="text" id="loginUser" placeholder="帳號" class="w-full px-4 py-3 border-2 border-gray-100 rounded-xl mb-3 focus:border-blue-400 focus:outline-none">
+            <input type="password" id="loginPass" placeholder="密碼" class="w-full px-4 py-3 border-2 border-gray-100 rounded-xl mb-4 focus:border-blue-400 focus:outline-none">
+            <button onclick="doLogin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl">登入</button>
+            <p id="loginError" class="text-red-500 text-sm mt-3 hidden"></p>
         </div>
     </div>
 
-    <div id="mainPanel" class="max-w-4xl mx-auto px-4 hidden">
-        <div class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold text-slate-800">訪問統計</h1>
-            <button onclick="doLogout()" class="px-3 py-1.5 bg-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-300">登出</button>
+    <div id="mainPanel" class="max-w-6xl mx-auto hidden">
+        <!-- Header -->
+        <div class="flex flex-wrap justify-between items-center mb-6 fade-in">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">流量統計</h1>
+                <p class="text-gray-400 text-sm mt-1">數據分析儀表板</p>
+            </div>
+            <div class="flex gap-3">
+                <a href="/mgmt/services" class="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm hover:bg-gray-50">返回管理</a>
+                <button onclick="doLogout()" class="px-4 py-2 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm hover:bg-gray-50">登出</button>
+            </div>
         </div>
-        
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 p-4">
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 fade-in">
+            <div class="kpi-card bg-white rounded-xl p-5 border border-gray-100 shadow-sm transition-all cursor-pointer" onclick="filterByDate('today')">
+                <p class="text-gray-400 text-xs font-medium uppercase mb-1">今日瀏覽</p>
+                <p class="text-3xl font-bold text-blue-600" id="kpiTodayVisits">-</p>
+            </div>
+            <div class="kpi-card bg-white rounded-xl p-5 border border-gray-100 shadow-sm transition-all cursor-pointer" onclick="filterByDate('today')">
+                <p class="text-gray-400 text-xs font-medium uppercase mb-1">今日訪客</p>
+                <p class="text-3xl font-bold text-emerald-600" id="kpiTodayUsers">-</p>
+            </div>
+            <div class="kpi-card bg-white rounded-xl p-5 border border-gray-100 shadow-sm transition-all cursor-pointer" onclick="filterByDate('all')">
+                <p class="text-gray-400 text-xs font-medium uppercase mb-1">總瀏覽</p>
+                <p class="text-3xl font-bold text-purple-600" id="kpiTotalVisits">-</p>
+            </div>
+            <div class="kpi-card bg-white rounded-xl p-5 border border-gray-100 shadow-sm transition-all cursor-pointer" onclick="filterByDate('all')">
+                <p class="text-gray-400 text-xs font-medium uppercase mb-1">獨立訪客</p>
+                <p class="text-3xl font-bold text-orange-600" id="kpiTotalUsers">-</p>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-xl p-4 mb-6 border border-gray-100 fade-in">
             <div class="flex flex-wrap gap-4 items-center">
                 <div class="flex items-center gap-2">
-                    <label class="text-sm font-medium text-slate-700">網頁:</label>
-                    <select id="pageSelect" onchange="switchPage()" class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">全部網頁</option>
+                    <label class="text-sm text-gray-600">時間範圍</label>
+                    <select id="dateRange" onchange="onDateRangeChange()" class="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="7">近7天</option>
+                        <option value="30">近30天</option>
+                        <option value="90">近90天</option>
+                        <option value="custom">自訂範圍</option>
                     </select>
+                </div>
+                <div id="customDateRange" class="hidden items-center gap-2">
+                    <input type="date" id="startDate" class="px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                    <span class="text-gray-400">至</span>
+                    <input type="date" id="endDate" class="px-3 py-2 border border-gray-200 rounded-lg text-sm">
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="text-sm text-slate-500">今日:</span>
-                    <span class="text-lg font-bold text-emerald-600" id="pageTodayUsers">-</span>
-                    <span class="text-xs text-slate-400">訪客</span>
-                    <span class="text-lg font-bold text-blue-600" id="pageTodayVisits">-</span>
-                    <span class="text-xs text-slate-400">次</span>
+                    <label class="text-sm text-gray-600">服務</label>
+                    <select id="serviceFilter" onchange="onServiceFilterChange()" class="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">全部服務</option>
+                    </select>
                 </div>
+                <button onclick="exportCSV()" class="ml-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    CSV
+                </button>
             </div>
         </div>
 
-        
-
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 mb-6">
-            <div class="px-5 py-4 border-b border-slate-100 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-                <div class="flex flex-wrap gap-2">
-                    <button onclick="switchChart('hour')" id="btnHour" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-sm hover:bg-slate-200">時</button>
-                    <button onclick="switchChart('daily')" id="btnDaily" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm">日</button>
-                    <button onclick="switchChart('weekly')" id="btnWeekly" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-sm hover:bg-slate-200">週</button>
-                    <button onclick="switchChart('monthly')" id="btnMonthly" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-sm hover:bg-slate-200">月</button>
+        <!-- Charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div class="bg-white rounded-xl p-5 border border-gray-100 fade-in">
+                <h3 class="font-bold text-gray-800 mb-4">流量趨勢</h3>
+                <div class="flex gap-2 mb-4">
+                    <button onclick="setChartType('daily')" id="btnDaily" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs">日</button>
+                    <button onclick="setChartType('hourly')" id="btnHourly" class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs hover:bg-gray-200">時</button>
+                    <button onclick="setChartType('weekly')" id="btnWeekly" class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs hover:bg-gray-200">週</button>
+                    <button onclick="setChartType('monthly')" id="btnMonthly" class="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs hover:bg-gray-200">月</button>
                 </div>
-                <div class="flex flex-wrap gap-2" id="filterControls">
-                    <input type="date" id="filterDate" class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <select id="filterWeek" class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hidden">
-                        <option value="">選擇週</option>
-                    </select>
-                    <select id="filterMonth" class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 hidden">
-                        <option value="">選擇月</option>
-                    </select>
-                    <button onclick="applyChartFilter()" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">篩選</button>
-                </div>
+                <div class="h-64"><canvas id="trendChart"></canvas></div>
             </div>
-            <div class="p-4">
-                <canvas id="trendChart"></canvas>
+            <div class="bg-white rounded-xl p-5 border border-gray-100 fade-in">
+                <h3 class="font-bold text-gray-800 mb-4">服務流量排名</h3>
+                <div class="h-64"><canvas id="serviceChart"></canvas></div>
             </div>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200">
-            <div class="px-5 py-4 border-b border-slate-100 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-                <div class="flex items-center gap-3">
-                    <h2 class="font-semibold text-slate-700">訪問記錄</h2>
-                    <span class="text-xs text-slate-400" id="totalRecords"></span>
-                </div>
-                <div class="flex flex-wrap gap-2">
-                    <input type="date" id="recordFilterDate" class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <input type="text" id="filterUser" placeholder="搜尋使用者ID" class="px-3 py-1.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-40">
-                    <button onclick="applyFilters()" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">篩選</button>
-                    <button onclick="clearFilters()" class="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-sm hover:bg-slate-200">清除</button>
+        <!-- Data Table -->
+        <div class="bg-white rounded-xl border border-gray-100 overflow-hidden fade-in">
+            <div class="px-5 py-4 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3">
+                <h3 class="font-bold text-gray-800">詳細數據</h3>
+                <div class="flex gap-2">
+                    <input type="text" id="searchInput" onkeyup="filterTable()" placeholder="搜尋..." class="px-3 py-2 border border-gray-200 rounded-lg text-sm w-40">
+                    <select id="sortField" onchange="sortTable()" class="px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                        <option value="time">時間</option>
+                        <option value="page">服務</option>
+                        <option value="userId">訪客ID</option>
+                    </select>
                 </div>
             </div>
-            <div class="overflow-x-auto">
+            <div class="overflow-x-auto max-h-96">
                 <table class="w-full text-sm">
-                    <thead>
-                        <tr class="text-slate-500 border-b border-slate-100 bg-slate-50">
-                            <th class="text-left py-3 px-4 font-medium">時間</th>
-                            <th class="text-left py-3 px-4 font-medium">網頁</th>
-                            <th class="text-left py-3 px-4 font-medium">使用者ID</th>
+                    <thead class="bg-slate-50 sticky top-0">
+                        <tr class="text-gray-500 text-left">
+                            <th class="py-3 px-4 font-medium cursor-pointer" onclick="sortBy('time')">時間 ↑↓</th>
+                            <th class="py-3 px-4 font-medium cursor-pointer" onclick="sortBy('page')">服務 ↑↓</th>
+                            <th class="py-3 px-4 font-medium">訪客ID</th>
                         </tr>
                     </thead>
                     <tbody id="recordsTable"></tbody>
                 </table>
             </div>
+            <div class="px-5 py-3 border-t border-gray-100 text-sm text-gray-400" id="tableInfo"></div>
         </div>
     </div>
 
-    <script>
-        document.getElementById('loginBtn').addEventListener('click', doLogin);
+    <div id="toast" class="hidden fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl shadow-xl z-[300] font-bold text-white transition-all scale-0 opacity-0"></div>
 
+    <script>
         let allRecords = [];
         let trendChart = null;
-        let currentPage = '';
-        const API_BASE = '';
+        let serviceChart = null;
+        let currentChartType = 'daily';
+        let currentDateRange = 7;
+        let currentService = '';
+        let sortColumn = 'time';
+        let sortAsc = false;
 
-        async function apiFetch(url, options = {}) {
-            return fetch(url, { credentials: 'include', ...options });
+        async function apiFetch(url) {
+            return fetch(url, { credentials: 'include' });
         }
 
-        async function doLogin() {
+        function doLogin() {
             const user = document.getElementById('loginUser').value;
             const pass = document.getElementById('loginPass').value;
-            const body = 'username=' + encodeURIComponent(user) + '&password=' + encodeURIComponent(pass);
-            const res = await fetch('/api/stats/login', {
+            fetch('/api/stats/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 credentials: 'include',
-                body: body
-            });
-            if (res.ok) {
-                document.getElementById('loginPanel').classList.add('hidden');
-                document.getElementById('mainPanel').classList.remove('hidden');
-                loadData();
-            } else {
-                document.getElementById('loginError').textContent = '帳號或密碼錯誤';
-                document.getElementById('loginError').classList.remove('hidden');
-            }
-        }
-
-        async function doLogout() {
-            await fetch('/api/stats/logout', { method: 'POST', credentials: 'include' });
-            document.getElementById('loginPanel').classList.remove('hidden');
-            document.getElementById('mainPanel').classList.add('hidden');
-        }
-
-        async function checkAuth() {
-            try {
-                const res = await fetch('/api/statistics', { credentials: 'include' });
+                body: `username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}`
+            }).then(res => {
                 if (res.ok) {
                     document.getElementById('loginPanel').classList.add('hidden');
                     document.getElementById('mainPanel').classList.remove('hidden');
                     loadData();
                 } else {
-                    document.getElementById('loginPanel').classList.remove('hidden');
-                    document.getElementById('mainPanel').classList.add('hidden');
+                    document.getElementById('loginError').textContent = '帳號或密碼錯誤';
+                    document.getElementById('loginError').classList.remove('hidden');
                 }
-            } catch (e) {
-                document.getElementById('loginPanel').classList.remove('hidden');
-                document.getElementById('mainPanel').classList.add('hidden');
-            }
-        }
-
-        async function loadPageList() {
-            const res = await apiFetch('/api/statistics/pages');
-            const pages = await res.json();
-            const select = document.getElementById('pageSelect');
-            select.innerHTML = '<option value="">全部網頁</option>';
-            Object.keys(pages).forEach(page => {
-                const label = page || '/';
-                select.innerHTML += `<option value="${page}">${label}</option>`;
             });
         }
 
-        async function loadPageTodayStats() {
-            const page = currentPage;
-            const url = page ? `/api/statistics/page/today?page=${encodeURIComponent(page)}` : '/api/statistics/today';
-            const res = await apiFetch(url);
-            const stats = await res.json();
-            document.getElementById('pageTodayUsers').textContent = stats.userCount || 0;
-            document.getElementById('pageTodayVisits').textContent = stats.visitCount || 0;
+        function doLogout() {
+            fetch('/api/stats/logout', { method: 'POST', credentials: 'include' });
+            document.getElementById('loginPanel').classList.remove('hidden');
+            document.getElementById('mainPanel').classList.add('hidden');
+            document.getElementById('loginUser').value = '';
+            document.getElementById('loginPass').value = '';
         }
 
-        async function switchPage() {
-            currentPage = document.getElementById('pageSelect').value;
-            await loadPageTodayStats();
-            await loadChartData(currentPeriod);
+        async function checkAuth() {
+            try {
+                const res = await apiFetch('/api/statistics');
+                if (res.ok) {
+                    document.getElementById('loginPanel').classList.add('hidden');
+                    document.getElementById('mainPanel').classList.remove('hidden');
+                    loadData();
+                }
+            } catch (e) {}
         }
 
         async function loadData() {
-            await loadPageList();
-            await loadPageTodayStats();
-            const recordsRes = await apiFetch('/api/statistics');
-            allRecords = await recordsRes.json();
-
-            document.getElementById('totalRecords').textContent = `共 ${allRecords.length} 筆`;
-
-            renderRecords(allRecords);
-            await switchChart('daily');
-        }
-
-        async function switchChart(period) {
-            currentPeriod = period;
-            updateFilterControls(period);
-            await loadChartData(period);
-        }
-
-        function updateFilterControls(period) {
-            const dateInput = document.getElementById('filterDate');
-            const weekSelect = document.getElementById('filterWeek');
-            const monthSelect = document.getElementById('filterMonth');
-
-            dateInput.classList.add('hidden');
-            weekSelect.classList.add('hidden');
-            monthSelect.classList.add('hidden');
-
-            if (period === 'hour') {
-                dateInput.classList.remove('hidden');
-                dateInput.type = 'date';
-                dateInput.value = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().split('T')[0];
-            } else if (period === 'daily') {
-                dateInput.classList.remove('hidden');
-                dateInput.type = 'date';
-            } else if (period === 'weekly') {
-                weekSelect.classList.remove('hidden');
-                populateWeekSelect();
-            } else if (period === 'monthly') {
-                monthSelect.classList.remove('hidden');
-                populateMonthSelect();
-            }
-
-            document.querySelectorAll('#btnHour, #btnDaily, #btnWeekly, #btnMonthly').forEach(btn => {
-                btn.classList.remove('bg-blue-600', 'text-white');
-                btn.classList.add('bg-slate-100', 'text-slate-600');
-            });
-            document.getElementById('btn' + period.charAt(0).toUpperCase() + period.slice(1)).classList.remove('bg-slate-100', 'text-slate-600');
-            document.getElementById('btn' + period.charAt(0).toUpperCase() + period.slice(1)).classList.add('bg-blue-600', 'text-white');
-        }
-
-        function populateWeekSelect() {
-            const select = document.getElementById('filterWeek');
-            select.innerHTML = '<option value="">選擇週</option>';
-            const now = new Date(Date.now() + 8 * 60 * 60 * 1000);
-            for (let i = 0; i < 52; i++) {
-                const date = new Date(now);
-                date.setDate(date.getDate() - i * 7);
-                const year = date.getFullYear();
-                const jan1 = new Date(year, 0, 1);
-                const daysToFirstWeek = (jan1.getDay() + 6) % 7;
-                const firstWeekStart = new Date(jan1);
-                firstWeekStart.setDate(jan1.getDate() - daysToFirstWeek);
-                let week = 1;
-                let current = new Date(firstWeekStart);
-                while (current < date) {
-                    current.setDate(current.getDate() + 7);
-                    week++;
-                }
-                if (week > 0) {
-                    select.innerHTML += `<option value="${year}-${week}">${year} 第${week}週</option>`;
-                }
-            }
-        }
-
-        function populateMonthSelect() {
-            const select = document.getElementById('filterMonth');
-            select.innerHTML = '<option value="">選擇月</option>';
-            const now = new Date(Date.now() + 8 * 60 * 60 * 1000);
-            for (let i = 0; i < 12; i++) {
-                const date = new Date(now);
-                date.setMonth(date.getMonth() - i);
-                select.innerHTML += `<option value="${date.getFullYear()}-${date.getMonth() + 1}">${date.getFullYear()}年${date.getMonth() + 1}月</option>`;
-            }
-        }
-
-        async function applyChartFilter() {
-            await loadChartData(currentPeriod);
-            updateFilteredRecords();
-        }
-
-        function getFilteredDateRange() {
-            const period = currentPeriod;
-            const filterDate = document.getElementById('filterDate').value;
-            const filterWeek = document.getElementById('filterWeek').value;
-            const filterMonth = document.getElementById('filterMonth').value;
-
-            if (period === 'hour' && filterDate) {
-                return { start: filterDate, end: filterDate };
-            } else if (period === 'daily' && filterDate) {
-                return { start: filterDate, end: filterDate };
-            } else if (period === 'weekly' && filterWeek) {
-                const [year, week] = filterWeek.split('-');
-                const jan1 = new Date(parseInt(year), 0, 1);
-                const daysToFirstWeek = jan1.getDay();
-                const firstWeekStart = new Date(jan1);
-                firstWeekStart.setDate(jan1.getDate() - daysToFirstWeek + 1);
-                const weekStart = new Date(firstWeekStart);
-                weekStart.setDate(firstWeekStart.getDate() + (parseInt(week) - 1) * 7);
-                const weekEnd = new Date(weekStart);
-                weekEnd.setDate(weekEnd.getDate() + 6);
-                const startStr = `${weekStart.getUTCFullYear()}-${String(weekStart.getUTCMonth() + 1).padStart(2, '0')}-${String(weekStart.getUTCDate()).padStart(2, '0')}`;
-                const endStr = `${weekEnd.getUTCFullYear()}-${String(weekEnd.getUTCMonth() + 1).padStart(2, '0')}-${String(weekEnd.getUTCDate()).padStart(2, '0')}`;
-                return { start: startStr, end: endStr };
-            } else if (period === 'monthly' && filterMonth) {
-                const [year, month] = filterMonth.split('-');
-                const startStr = `${year}-${String(month).padStart(2, '0')}-01`;
-                const endDate = new Date(parseInt(year), parseInt(month), 0);
-                const endStr = `${year}-${String(month).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
-                return { start: startStr, end: endStr };
-            }
-            return null;
-        }
-
-        function updateFilteredRecords() {
-            const range = getFilteredDateRange();
-            let filtered = allRecords;
-            
-            if (range) {
-                filtered = filtered.filter(r => {
-                    const recordDate = r.time.split('T')[0];
-                    return recordDate >= range.start && recordDate <= range.end;
-                });
-            }
-            
-            if (currentPage) {
-                filtered = filtered.filter(r => r.pagePath === currentPage);
-            }
-            
-            renderRecords(filtered);
-        }
-
-        async function loadChartData(period) {
-            let url, chartLabels, data;
-            const filterDate = document.getElementById('filterDate').value;
-            const filterWeek = document.getElementById('filterWeek').value;
-            const filterMonth = document.getElementById('filterMonth').value;
-            const pageParam = currentPage ? `&page=${encodeURIComponent(currentPage)}` : '';
-
             try {
-                if (period === 'hour') {
-                    url = '/api/statistics/trend/hour?hours=24' + pageParam;
-                    const res = await apiFetch(url);
-                    data = await res.json();
-                    chartLabels = data.map(d => `${d.date.slice(5)} ${d.hour}:00`);
-                } else if (period === 'daily') {
-                    if (filterDate) {
-                        url = `/api/statistics/filter/daily?date=${filterDate}` + pageParam;
-                        const res = await apiFetch(url);
-                        data = await res.json();
-                        chartLabels = data.hourly ? data.hourly.map(d => `${d.hour}:00`) : [];
-                    } else {
-                        url = '/api/statistics/trend/daily?days=7' + pageParam;
-                        const res = await apiFetch(url);
-                        data = await res.json();
-                        chartLabels = data.map(d => d.date.slice(5));
-                    }
-                } else if (period === 'weekly') {
-                    if (filterWeek) {
-                        const [year, week] = filterWeek.split('-');
-                        url = `/api/statistics/filter/weekly?year=${year}&week=${week}`;
-                        const res = await apiFetch(url);
-                        data = await res.json();
-                        chartLabels = data.daily ? data.daily.map(d => d.date.slice(5)) : [];
-                    } else {
-                        url = '/api/statistics/trend/weekly';
-                        const res = await apiFetch(url);
-                        data = await res.json();
-                        chartLabels = data.map(d => d.week);
-                    }
-                } else if (period === 'monthly') {
-                    if (filterMonth) {
-                        const [year, month] = filterMonth.split('-');
-                        url = `/api/statistics/filter/monthly?year=${year}&month=${month}`;
-                        const res = await apiFetch(url);
-                        data = await res.json();
-                        chartLabels = data.daily ? data.daily.map(d => d.date.slice(5)) : [];
-                    } else {
-                        url = '/api/statistics/trend/monthly';
-                        const res = await apiFetch(url);
-                        data = await res.json();
-                        chartLabels = data.map(d => d.month);
-                    }
+                const [kpiRes, serviceRes, recordsRes] = await Promise.all([
+                    apiFetch('/api/statistics/kpi'),
+                    apiFetch('/api/statistics/service-stats'),
+                    apiFetch('/api/statistics')
+                ]);
+                
+                const kpi = await kpiRes.json();
+                document.getElementById('kpiTodayVisits').textContent = kpi.todayVisits || 0;
+                document.getElementById('kpiTodayUsers').textContent = kpi.todayUsers || 0;
+                document.getElementById('kpiTotalVisits').textContent = (kpi.totalVisits || 0).toLocaleString();
+                document.getElementById('kpiTotalUsers').textContent = (kpi.totalUsers || 0).toLocaleString();
+
+                const services = await serviceRes.json();
+                
+                allRecords = await recordsRes.json();
+                
+                const serviceSelect = document.getElementById('serviceFilter');
+                const uniquePages = [...new Set(allRecords.map(r => r.pagePath))].filter(Boolean);
+                uniquePages.forEach(page => {
+                    const opt = document.createElement('option');
+                    opt.value = page;
+                    opt.textContent = page || '/';
+                    serviceSelect.appendChild(opt);
+                });
+
+                renderTable(allRecords);
+                loadServiceChart(services);
+                loadTrendChart('daily');
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function loadTrendChart(type) {
+            currentChartType = type;
+            document.querySelectorAll('[id^="btn"]').forEach(btn => {
+                if (btn.id.startsWith('btn')) {
+                    btn.className = btn.id === 'btn' + type.charAt(0).toUpperCase() + type.slice(1) 
+                        ? 'px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs'
+                        : 'px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg text-xs hover:bg-gray-200';
                 }
-            } catch (e) {
-                console.error('loadChartData error:', e);
-                return;
-            }
-
-            let userData, visitData;
-
-            if (period === 'hour' && data && Array.isArray(data)) {
-                userData = data.map(d => d.users);
-                visitData = data.map(d => d.visits);
-            } else if (period === 'daily' && filterDate && data && data.hourly) {
-                userData = data.hourly.map(d => d.users);
-                visitData = data.hourly.map(d => d.visits);
-            } else if (period === 'daily' && data && Array.isArray(data)) {
-                userData = data.map(d => d.users);
-                visitData = data.map(d => d.visits);
-            } else if (period === 'weekly' && filterWeek && data && data.daily) {
-                userData = data.daily.map(d => d.users);
-                visitData = data.daily.map(d => d.visits);
-            } else if (period === 'weekly' && data && Array.isArray(data)) {
-                userData = data.map(d => d.users);
-                visitData = data.map(d => d.visits);
-            } else if (period === 'monthly' && filterMonth && data && data.daily) {
-                userData = data.daily.map(d => d.users);
-                visitData = data.daily.map(d => d.visits);
-            } else if (period === 'monthly' && data && Array.isArray(data)) {
-                userData = data.map(d => d.users);
-                visitData = data.map(d => d.visits);
-            } else {
-                console.error('No data to display:', { period, filterDate, filterWeek, filterMonth, data });
-                return;
-            }
-
-            const ctx = document.getElementById('trendChart').getContext('2d');
+            });
             
-            if (trendChart) {
-                trendChart.destroy();
-            }
-
+            const res = await apiFetch(`/api/statistics/chart?type=${type}&page=${currentService}`);
+            const data = await res.json();
+            
+            const labels = data.map(d => d.date || d.week || d.month || d.hour || '');
+            const visits = data.map(d => d.visits || 0);
+            const users = data.map(d => d.users || 0);
+            
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            if (trendChart) trendChart.destroy();
+            
             trendChart = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: chartLabels,
+                    labels,
                     datasets: [
-                        {
-                            label: '訪客數',
-                            data: userData,
-                            borderColor: '#10b981',
-                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                            tension: 0.3,
-                            fill: true
-                        },
-                        {
-                            label: '訪問次數',
-                            data: visitData,
-                            borderColor: '#3b82f6',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                            tension: 0.3,
-                            fill: true
-                        }
+                        { label: '瀏覽次數', data: visits, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', tension: 0.3, fill: true },
+                        { label: '獨立訪客', data: users, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', tension: 0.3, fill: true }
                     ]
                 },
                 options: {
                     responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'top'
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                stepSize: 1
-                            }
-                        }
-                    }
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } },
+                    scales: { y: { beginAtZero: true } }
                 }
             });
         }
 
-        let currentPeriod = 'daily';
+        async function loadServiceChart(services) {
+            if (services.length === 0) return;
+            const labels = services.slice(0, 10).map(s => s.page || '/');
+            const data = services.slice(0, 10).map(s => s.visits);
+            
+            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'];
+            
+            const ctx = document.getElementById('serviceChart').getContext('2d');
+            if (serviceChart) serviceChart.destroy();
+            
+            serviceChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{ label: '瀏覽次數', data, backgroundColor: colors }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: { legend: { display: false } },
+                    scales: { x: { beginAtZero: true } }
+                }
+            });
+        }
 
-        function renderRecords(records) {
-            document.getElementById('totalRecords').textContent = `共 ${records.length} 筆`;
-            document.getElementById('recordsTable').innerHTML = records.map(r => `
-                <tr class="border-b border-slate-50 hover:bg-slate-50 fade-in">
-                    <td class="py-2 px-4 text-slate-600 whitespace-nowrap">${r.time.replace('T', ' ').substring(0, 19)}</td>
-                    <td class="py-2 px-4 text-slate-800 font-mono text-xs">${r.pagePath || '/'}</td>
-                    <td class="py-2 px-4 text-slate-800 font-mono text-xs" title="${r.userId}">${r.userId}</td>
+        function renderTable(records) {
+            const tbody = document.getElementById('recordsTable');
+            const sorted = [...records].sort((a, b) => {
+                let va = a[sortColumn], vb = b[sortColumn];
+                if (sortColumn === 'time') {
+                    va = new Date(va);
+                    vb = new Date(vb);
+                }
+                return sortAsc ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1);
+            });
+            
+            tbody.innerHTML = sorted.slice(0, 500).map(r => `
+                <tr class="border-b border-slate-50 hover:bg-slate-50">
+                    <td class="py-2 px-4 text-gray-600 whitespace-nowrap">${r.time?.replace('T', ' ').substring(0, 19) || '-'}</td>
+                    <td class="py-2 px-4 text-gray-800">${r.pagePath || '/'}</td>
+                    <td class="py-2 px-4 text-gray-400 font-mono text-xs" title="${r.userId || ''}">${(r.userId || '').substring(0, 8)}...</td>
                 </tr>
             `).join('');
+            
+            document.getElementById('tableInfo').textContent = `顯示 ${Math.min(500, sorted.length)} / ${sorted.length} 筆記錄`;
         }
 
-        function applyFilters() {
-            const filterDate = document.getElementById('recordFilterDate').value;
-            const filterUser = document.getElementById('filterUser').value.toLowerCase();
-
-            let filtered = allRecords;
-
-            if (filterDate) {
-                filtered = filtered.filter(r => r.time.startsWith(filterDate));
-            }
-
-            if (filterUser) {
-                filtered = filtered.filter(r => r.userId.toLowerCase().includes(filterUser));
-            }
-
-            renderRecords(filtered);
+        function sortBy(col) {
+            if (sortColumn === col) sortAsc = !sortAsc;
+            else { sortColumn = col; sortAsc = false; }
+            renderTable(allRecords);
         }
 
-        function clearFilters() {
-            document.getElementById('recordFilterDate').value = '';
-            document.getElementById('filterUser').value = '';
-            renderRecords(allRecords);
+        function sortTable() {
+            sortColumn = document.getElementById('sortField').value;
+            renderTable(allRecords);
+        }
+
+        function filterTable() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allRecords.filter(r => 
+                (r.pagePath || '').toLowerCase().includes(search) ||
+                (r.userId || '').toLowerCase().includes(search)
+            );
+            renderTable(filtered);
+        }
+
+        function onDateRangeChange() {
+            const val = document.getElementById('dateRange').value;
+            const customDiv = document.getElementById('customDateRange');
+            if (val === 'custom') {
+                customDiv.classList.remove('hidden');
+                customDiv.classList.add('flex');
+            } else {
+                customDiv.classList.add('hidden');
+                customDiv.classList.remove('flex');
+                currentDateRange = parseInt(val);
+                loadTrendChart(currentChartType);
+            }
+        }
+
+        function onServiceFilterChange() {
+            currentService = document.getElementById('serviceFilter').value;
+            loadTrendChart(currentChartType);
+        }
+
+        function setChartType(type) {
+            loadTrendChart(type);
+        }
+
+        function filterByDate(type) {
+            if (type === 'today') {
+                document.getElementById('dateRange').value = '7';
+                currentDateRange = 7;
+            } else {
+                document.getElementById('dateRange').value = '30';
+                currentDateRange = 30;
+            }
+            loadTrendChart(currentChartType);
+        }
+
+        function exportCSV() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const service = document.getElementById('serviceFilter').value;
+            let url = '/api/statistics/export';
+            const params = [];
+            if (service) params.push(`page=${encodeURIComponent(service)}`);
+            if (start) params.push(`start=${start}`);
+            if (end) params.push(`end=${end}`);
+            if (params.length) url += '?' + params.join('&');
+            window.location.href = url;
         }
 
         checkAuth();
