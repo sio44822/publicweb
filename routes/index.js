@@ -3,6 +3,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const statistics = require('../utils/statistics');
 const statisticsRoutes = require('./statistics');
+const servicesLoader = require('../utils/services-loader');
 
 const router = express.Router();
 
@@ -60,6 +61,64 @@ router.get('/public/11.html', (req, res) => {
 
 router.get('/', (req, res) => {
   res.send(`URLBASE: ${URLBASE}<br>Mode: ${isDev ? 'Development' : 'Production'}`);
+});
+
+router.get('/services', (req, res) => {
+  res.render('services');
+});
+
+router.get('/statistics', (req, res) => {
+  res.render('statistics');
+});
+
+router.get('/api/services', (req, res) => {
+  const services = servicesLoader.getEnabledServices();
+  res.json(services);
+});
+
+router.get('/mgmt/services', (req, res) => {
+  const config = servicesLoader.getServices();
+  res.render('admin/services', { services: config.services });
+});
+
+router.post('/api/services/update', (req, res) => {
+  const { services } = req.body;
+  if (!services || !Array.isArray(services)) {
+    return res.status(400).json({ error: 'Invalid data' });
+  }
+  const errors = servicesLoader.validateServices(services);
+  if (errors.length > 0) {
+    return res.status(400).json({ error: errors.join('; ') });
+  }
+  servicesLoader.saveServices({ services });
+  res.json({ success: true });
+});
+
+const ADMIN_COOKIE = 'services_admin';
+const ADMIN_SECRET = 'publicweb-services-2024';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '28345013';
+
+router.get('/api/services/login', (req, res) => {
+  const cookie = req.cookies[ADMIN_COOKIE];
+  if (cookie === ADMIN_SECRET) {
+    return res.json({ ok: true });
+  }
+  res.status(401).json({ error: 'Unauthorized' });
+});
+
+router.post('/api/services/login', (req, res) => {
+  const { password } = req.body;
+  if (password === ADMIN_PASSWORD) {
+    res.cookie(ADMIN_COOKIE, ADMIN_SECRET, { maxAge: 86400000, httpOnly: true });
+    res.json({ ok: true });
+  } else {
+    res.status(401).json({ error: 'Invalid password' });
+  }
+});
+
+router.post('/api/services/logout', (req, res) => {
+  res.clearCookie(ADMIN_COOKIE);
+  res.json({ ok: true });
 });
 
 module.exports = router;
