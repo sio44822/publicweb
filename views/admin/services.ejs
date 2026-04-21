@@ -31,13 +31,14 @@
         </div>
     </div>
 
-    <div id="mainPanel" class="max-w-2xl mx-auto hidden">
+    <div id="mainPanel" class="max-w-2xl mx-auto <%= isAdmin ? '' : 'hidden' %>">
         <header class="flex items-center justify-between mb-8 fade-in">
             <div>
                 <h1 class="text-2xl font-bold text-gray-800">服務管理</h1>
                 <p class="mt-1 text-gray-400 text-sm">管理服務顯示與排序</p>
             </div>
             <div class="flex gap-3">
+                <a href="/statistics" class="text-blue-600 hover:text-blue-700 text-sm font-medium">📊 訪問統計</a>
                 <a href="/services" class="text-gray-400 hover:text-gray-600 text-sm">返回服務</a>
                 <button onclick="doLogout()" class="text-gray-400 hover:text-gray-600 text-sm">登出</button>
             </div>
@@ -81,6 +82,7 @@
     <script>
         let servicesData = <%- JSON.stringify(services) %>;
         let editingId = null;
+        const isAdmin = <%- isAdmin %>;
 
         function doLogin() {
             const pass = document.getElementById('adminPass').value;
@@ -226,6 +228,11 @@
             }, 2000);
         }
 
+        if (isAdmin) {
+            document.getElementById('loginPanel').classList.add('hidden');
+            document.getElementById('mainPanel').classList.remove('hidden');
+        }
+        
         checkAuth();
     </script>
 </body>

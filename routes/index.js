@@ -77,8 +77,10 @@ router.get('/api/services', (req, res) => {
 });
 
 router.get('/mgmt/services', (req, res) => {
+  const cookie = req.cookies[ADMIN_COOKIE];
+  const isAdmin = cookie === ADMIN_SECRET;
   const config = servicesLoader.getServices();
-  res.render('admin/services', { services: config.services });
+  res.render('admin/services', { services: config.services, isAdmin });
 });
 
 router.post('/api/services/update', (req, res) => {
