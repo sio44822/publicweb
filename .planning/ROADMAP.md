@@ -119,7 +119,7 @@ Plans:
 
 ## Phase 5: Refactor & Verification
 
-**Status:** Not Started
+**Status:** In Planning
 **Goal:** Refactor routes to use database and verify everything works
 
 ### Requirements
@@ -137,7 +137,10 @@ Plans:
 
 ### Plans
 
-TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 05-refactor-verification/05-01-PLAN.md — Refactor routes to use database and verify endpoints
 
 ---
 
