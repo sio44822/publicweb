@@ -189,12 +189,6 @@
                             <span class="text-gray-400 text-xs">上限</span>
                         </div>
                         <div class="w-px h-4 bg-gray-300"></div>
-                        <div class="flex items-center gap-1">
-                            <input type="number" value="${booked}" placeholder="已報名"
-                                onchange="updateSlot('${course.id}', ${idx}, 'booked', parseInt(this.value) || 0)"
-                                class="input-minimal w-8 text-gray-600">
-                            <span class="text-gray-400 text-xs">已報</span>
-                        </div>
                         <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${
                             booked >= limit ? 'bg-red-100 text-red-600' : 
                             remaining <= 1 ? 'bg-amber-100 text-amber-600' : 
