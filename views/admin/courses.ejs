@@ -11,52 +11,66 @@
         .slot-pill {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
+            gap: 6px;
+            padding: 10px 14px;
             background: white;
             border: 1px solid #e5e7eb;
-            border-radius: 12px;
+            border-radius: 50px;
             transition: all 0.2s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.04);
         }
         .slot-pill:hover {
-            border-color: #d1d5db;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border-color: #c7d2fe;
+            box-shadow: 0 4px 12px rgba(99,102,241,0.1);
         }
         .slot-pill.full {
             background: #fef2f2;
-            border-color: #fecaca;
+            border-color: #fca5a5;
         }
         .slot-pill.almost-full {
             background: #fffbeb;
-            border-color: #fde68a;
+            border-color: #fcd34d;
         }
         .slot-pill.available {
             background: #f0fdf4;
-            border-color: #bbf7d0;
+            border-color: #86efac;
         }
-        .sync-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
+        .slot-time {
+            font-weight: 600;
+            color: #374151;
+            min-width: 40px;
+        }
+        .slot-divider {
+            width: 1px;
+            height: 16px;
+            background: #d1d5db;
+            margin: 0 4px;
+        }
+        .slot-badge {
             padding: 4px 10px;
             border-radius: 9999px;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 600;
+            white-space: nowrap;
         }
-        .sync-badge.loading { background: #fef3c7; color: #92400e; }
-        .sync-badge.success { background: #d1fae5; color: #065f46; }
-        .sync-badge.error { background: #fee2e2; color: #991b1b; }
+        .slot-badge.full { background: #fee2e2; color: #dc2626; }
+        .slot-badge.almost-full { background: #fef3c7; color: #d97706; }
+        .slot-badge.available { background: #dcfce7; color: #16a34a; }
         .input-minimal {
             background: transparent;
             border: none;
-            text-align: center;
             outline: none;
             font-size: 14px;
-        }
-        .input-minimal:focus {
-            background: white;
+            font-weight: 500;
+            color: #4b5563;
+            text-align: center;
             border-radius: 6px;
-            box-shadow: 0 0 0 2px #dbeafe;
+            transition: all 0.15s;
+        }
+        .input-minimal:hover { background: #f3f4f6; }
+        .input-minimal:focus {
+            background: #eff6ff;
+            box-shadow: 0 0 0 2px #bfdbfe;
         }
     </style>
 </head>
@@ -174,27 +188,23 @@
                     const limit = slot.limit || 3;
                     const remaining = limit - booked;
                     let pillClass = 'available';
-                    let statusText = `剩${remaining}位`;
-                    if (booked >= limit) { pillClass = 'full'; statusText = '已額滿'; }
-                    else if (remaining <= 1) { pillClass = 'almost-full'; }
+                    let badgeClass = 'available';
+                    let statusText = `${remaining} 位`;
+                    if (booked >= limit) { pillClass = 'full'; badgeClass = 'full'; statusText = '額滿'; }
+                    else if (remaining <= 1) { pillClass = 'almost-full'; badgeClass = 'almost-full'; }
                     return `
                     <div class="slot-pill ${pillClass}">
                         <input type="text" value="${slot.time}" placeholder="時段"
                             onchange="updateSlot('${course.id}', ${idx}, 'time', this.value)"
-                            class="input-minimal w-12 text-gray-700 font-medium">
-                        <div class="flex items-center gap-1">
-                            <input type="number" value="${limit}" placeholder="名額"
-                                onchange="updateSlot('${course.id}', ${idx}, 'limit', parseInt(this.value) || 3)"
-                                class="input-minimal w-8 text-gray-600">
-                            <span class="text-gray-400 text-xs">上限</span>
-                        </div>
-                        <div class="w-px h-4 bg-gray-300"></div>
-                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${
-                            booked >= limit ? 'bg-red-100 text-red-600' : 
-                            remaining <= 1 ? 'bg-amber-100 text-amber-600' : 
-                            'bg-green-100 text-green-600'
-                        }">${statusText}</span>
-                        <button onclick="removeSlot('${course.id}', ${idx})" class="ml-1 text-gray-400 hover:text-red-500 transition-colors">✕</button>
+                            class="input-minimal slot-time" style="width: 48px;">
+                        <div class="slot-divider"></div>
+                        <span class="text-gray-500 text-sm font-medium">上限</span>
+                        <input type="number" value="${limit}" placeholder="名額" min="1"
+                            onchange="updateSlot('${course.id}', ${idx}, 'limit', parseInt(this.value) || 3)"
+                            class="input-minimal" style="width: 28px;">
+                        <div class="slot-divider"></div>
+                        <span class="slot-badge ${badgeClass}">${statusText}</span>
+                        <button onclick="removeSlot('${course.id}', ${idx})" class="ml-2 text-gray-400 hover:text-red-500 transition-colors">✕</button>
                     </div>
                 `}).join('');
                 
