@@ -20,10 +20,10 @@ const createTables = () => {
     )
   `);
   
-  // Services table
+  // Services table (uses TEXT id to support string IDs like 'booking', 'coupon')
   db.exec(`
     CREATE TABLE IF NOT EXISTS services (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       description TEXT,
       url TEXT,

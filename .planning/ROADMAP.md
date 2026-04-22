@@ -62,7 +62,7 @@ Plans:
 
 ## Phase 3: Statistics Migration
 
-**Status:** Not Started
+**Status:** In Planning
 **Goal:** Migrate statistics data from JSON to SQLite
 
 ### Requirements
@@ -78,13 +78,16 @@ Plans:
 
 ### Plans
 
-TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 03-statistics-migration/03-01-PLAN.md — Statistics data access layer and migration
 
 ---
 
 ## Phase 4: Services Migration & Data Access Layer
 
-**Status:** Not Started
+**Status:** In Planning
 **Goal:** Migrate services and create new data access layer
 
 ### Requirements
@@ -105,6 +108,12 @@ TBD
 ### Plans
 
 TBD
+
+**Plans:** 2 plans
+
+Plans:
+- [ ] 04-services-migration/04-01-PLAN.md — Services data access layer and migration
+- [ ] 04-services-migration/04-02-PLAN.md — Unified data access module (index.js)
 
 ---
 

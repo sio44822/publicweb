@@ -1,5 +1,21 @@
 # Milestones
 
+## v1.2 - SQLite Database Migration
+
+**Planned:** 2026-04-23
+**Phases:** 5
+**Status:** Planning
+
+### Target Features
+
+- Set up SQLite database for the project
+- Migrate courses.json data to SQLite
+- Migrate statistics.json data to SQLite
+- Create new data access layer (courses, statistics)
+- Refactor existing code to use SQLite instead of file-based loaders
+
+---
+
 ## v1.0 - Services Navigation
 
 **Shipped:** 2026-04-21

@@ -1,75 +1,144 @@
 # Requirements: Service Navigation Layer
 
-**Phase:** 1
-**Status:** Defined
-**Created:** 2026-04-21
+**Milestone:** v1.2 SQLite Database Migration
+**Phase:** Defined
+**Created:** 2026-04-23
 
-## User Requirements
+## Overview
 
-### UR-01: User Service Directory
-As a general user, I want to visit `/services/` and see a grid of all available public services so that I can easily discover and access them.
-
-**Acceptance Criteria:**
-- [ ] Route `/services/` returns an HTML page with service cards
-- [ ] Services displayed in a responsive grid layout
-- [ ] Each card shows: service name, brief description, icon/thumbnail
-- [ ] Cards link to actual service pages (`/public/1`, `/public/coupon`, `/public/url-qr-doc-tool`)
-- [ ] Mobile: single column layout
-- [ ] Desktop: multi-column grid (2-3 columns)
-
-### UR-02: Admin Service Management
-As an administrator, I want to manage services at `/mgmt/services` so that I can control which services are visible and their display order.
-
-**Acceptance Criteria:**
-- [ ] Route `/mgmt/services` returns an admin management page
-- [ ] List of all services with toggle to enable/disable
-- [ ] Drag-and-drop or button controls to reorder services
-- [ ] Edit service name and description
-- [ ] Changes persist during session (file-based or memory for Phase 1)
-
-## Non-Functional Requirements
-
-### NFR-01: Visual Design
-- Minimalist design with clear typography and spacing
-- Generous whitespace for readability
-- Consistent with existing `coupon.ejs` low-contrast style
-- Cards use existing Tailwind patterns: `rounded-2xl`, `shadow-sm`, `border`
-
-### NFR-02: Responsive Behavior
-- Mobile (< 768px): Single column, full-width cards
-- Desktop (≥ 768px): 2-3 column grid
-
-### NFR-03: Performance
-- No additional database queries for Phase 1
-- Service configuration stored in-memory or JSON file
-
-### NFR-04: Existing Service Preservation
-- `coupon.ejs` remains unchanged
-- Existing routes (`/public/1`, `/public/coupon`, `/public/url-qr-doc-tool`) unaffected
-- Statistics recording continues for existing pages
-
-## Technical Decisions (from Phase 1 Context)
-
-### D-01: Route Structure
-- User view: `/services/`
-- Admin view: `/mgmt/services` (mgmt prefix distinguishes from public routes)
-
-### D-02: Admin Interface
-- Server-rendered EJS page (not SPA)
-- Simple toggle switches for enable/disable
-- Up/down arrows or reorder buttons for ordering
-
-### D-03: Service Configuration
-- Initial hardcoded service list in route handler
-- File-based config (`data/services.json`) for persistence
-- Structure: `{ id, name, description, path, icon, enabled, order }`
-
-### D-04: Styling Approach
-- Inline Tailwind classes (matching existing 1.ejs patterns)
-- No new CSS files required
-- Reuse existing card patterns
+Replace JSON file storage with SQLite database. Migrate existing course and statistics data, create new data access layer, and refactor existing code.
 
 ---
 
-*Requirements defined: 2026-04-21*
-*Phase: 01-services-nav*
+## v1 Requirements
+
+### DB-01: SQLite Database Setup
+Set up SQLite database for the project with proper schema.
+
+**Acceptance Criteria:**
+- [ ] SQLite database file at `data/publicweb.db`
+- [ ] Database initialization script creates all required tables
+- [ ] Tables: `courses`, `services`, `statistics`, `daily_stats`
+- [ ] Foreign key relationships where applicable
+
+### DB-02: Database Connection Layer
+Create database connection module with connection pooling.
+
+**Acceptance Criteria:**
+- [ ] Connection module at `utils/db/connection.js`
+- [ ] Use `better-sqlite3` for synchronous operations
+- [ ] Environment-based database path (dev vs prod)
+- [ ] Error handling for connection failures
+
+### DB-03: Courses Migration
+Migrate courses data from JSON to SQLite.
+
+**Acceptance Criteria:**
+- [ ] Export existing courses from `data/courses.json`
+- [ ] Insert courses into SQLite `courses` table
+- [ ] Preserve course IDs, names, descriptions, images
+- [ ] Migrate course slots (time, limit, booked count)
+- [ ] Verify all courses migrated correctly
+
+### DB-04: Statistics Migration
+Migrate statistics data from JSON to SQLite.
+
+**Acceptance Criteria:**
+- [ ] Export existing statistics from `data/coupon-statistics.json`
+- [ ] Insert records into SQLite `statistics` table
+- [ ] Preserve userId, pagePath, timestamp
+- [ ] Migrate daily statistics from `data/daily-statistics.json`
+- [ ] Verify all records migrated correctly
+
+### DB-05: Services Migration
+Migrate services config from JSON to SQLite.
+
+**Acceptance Criteria:**
+- [ ] Export existing services from `data/services.json`
+- [ ] Insert services into SQLite `services` table
+- [ ] Preserve service order, enabled status
+- [ ] Verify all services migrated correctly
+
+### DB-06: Course Data Access Layer
+Create SQLite-based course repository.
+
+**Acceptance Criteria:**
+- [ ] Repository module at `utils/db/courses.js`
+- [ ] CRUD operations: getAll, getById, add, update, delete
+- [ ] Slot management operations
+- [ ] Consistent with existing `courses-loader.js` API
+- [ ] Unit tests for critical operations
+
+### DB-07: Statistics Data Access Layer
+Create SQLite-based statistics repository.
+
+**Acceptance Criteria:**
+- [ ] Repository module at `utils/db/statistics.js`
+- [ ] Record visit operations
+- [ ] Query operations: getTodayStats, getPageStats, getDailyTrend
+- [ ] Consistent with existing `statistics.js` API
+- [ ] Unit tests for critical operations
+
+### DB-08: Services Data Access Layer
+Create SQLite-based services repository.
+
+**Acceptance Criteria:**
+- [ ] Repository module at `utils/db/services.js`
+- [ ] CRUD operations: getAll, getEnabled, getById, update
+- [ ] Consistent with existing `services-loader.js` API
+- [ ] Unit tests for critical operations
+
+### DB-09: Refactor Routes to Use Database
+Update route handlers to use new database layer.
+
+**Acceptance Criteria:**
+- [ ] `routes/index.js` imports database modules
+- [ ] Course routes use `utils/db/courses.js`
+- [ ] Service routes use `utils/db/services.js`
+- [ ] Statistics recorded via `utils/db/statistics.js`
+- [ ] No breaking changes to existing API contracts
+
+### DB-10: Verification & Testing
+Verify migration and refactoring work correctly.
+
+**Acceptance Criteria:**
+- [ ] All API endpoints return expected data
+- [ ] Course CRUD operations work
+- [ ] Statistics recording works
+- [ ] Service management works
+- [ ] No data loss after migration
+
+---
+
+## Technical Decisions
+
+### D-01: SQLite Library Choice
+- Use `better-sqlite3` for synchronous, fast operations
+- Alternative: `sqlite3` for async if needed
+
+### D-02: Database Location
+- Development: `data/publicweb.db`
+- Production: Use environment variable `DATABASE_PATH`
+
+### D-03: Migration Strategy
+- One-time migration script
+- Keep JSON files as backup until verified
+- Rollback plan if issues found
+
+### D-04: API Compatibility
+- Keep same function signatures as existing loaders
+- Drop-in replacement for existing modules
+
+---
+
+## Out of Scope
+
+- GraphQL API (future milestone)
+- Multiple database support (PostgreSQL, MySQL)
+- Real-time sync between instances
+- Advanced caching layer
+
+---
+
+*Requirements defined: 2026-04-23*
+*Milestone: v1.2 SQLite Database Migration*

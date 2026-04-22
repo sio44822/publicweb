@@ -26,6 +26,17 @@ Create a navigation system that:
 - Existing service pages remain unchanged (`/public/1`, `/public/coupon`, `/public/url-qr-doc-tool`)
 - No database changes required for Phase 1 (file-based or in-memory service config)
 
+## Current Milestone: v1.2 SQLite Database Migration
+
+**Goal:** Replace JSON file storage with SQLite database for courses and statistics
+
+**Target features:**
+- Set up SQLite database for the project
+- Migrate `courses.json` data to SQLite
+- Migrate `statistics.json` data to SQLite
+- Create new data access layer (courses, statistics)
+- Refactor existing code to use SQLite instead of file-based loaders
+
 ## Technical Context
 
 ### Stack
@@ -33,6 +44,7 @@ Create a navigation system that:
 - EJS 5.0.2 templating
 - Tailwind CSS (already in use)
 - Cookie-based user identification (existing)
+- **SQLite** - New database
 
 ### Entry Points
 - `app.js` - Express application entry
@@ -40,11 +52,31 @@ Create a navigation system that:
 - `views/` - EJS templates
 
 ### Integration Points
-- Routes: Add `/services/` and `/mgmt/services` routes
-- Views: Create service grid and admin management templates
-- Statistics: Existing user tracking can be reused for nav page visits
+- SQLite integration via `better-sqlite3` (sync) or `sqlite3` (async)
+- Data access layer in `utils/db/` directory
+- Refactor `utils/courses-loader.js`, `utils/services-loader.js`, `utils/statistics.js`
+
+---
+
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
 
 ---
 
 *Project: publicweb*
 *Created: 2026-04-21*
+*Last updated: 2026-04-23*
