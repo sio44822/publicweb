@@ -36,7 +36,12 @@ function getById(id) {
  */
 function add(course) {
   const db = get();
-  const slots = JSON.stringify(course.slots || []);
+  let slotsData = course.slots;
+  if (typeof slotsData === 'string') {
+    try { slotsData = JSON.parse(slotsData); } catch { slotsData = []; }
+  }
+  if (!Array.isArray(slotsData)) slotsData = [];
+  const slots = JSON.stringify(slotsData);
   
   const stmt = db.prepare(`
     INSERT INTO courses (name, description, image, slots)
