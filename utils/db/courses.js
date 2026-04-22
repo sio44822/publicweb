@@ -66,15 +66,27 @@ function add(course) {
  */
 function updateCourse(id, updates) {
   const db = get();
+  if (!updates || Object.keys(updates).length === 0) return getById(id);
+  
   const existing = getById(id);
   if (!existing) return null;
   
   const merged = { ...existing, ...updates };
-  if (updates.slots) {
-    merged.slots = updates.slots;
+  if (updates.slots !== undefined) {
+    let slotsData = updates.slots;
+    if (typeof slotsData === 'string') {
+      try { slotsData = JSON.parse(slotsData); } catch { slotsData = []; }
+    }
+    if (!Array.isArray(slotsData)) slotsData = [];
+    merged.slots = slotsData;
   }
   
-  const slots = JSON.stringify(merged.slots || []);
+  let slotsStr = merged.slots;
+  if (typeof slotsStr === 'string') {
+    try { slotsStr = JSON.parse(slotsStr); } catch { slotsStr = []; }
+  }
+  if (!Array.isArray(slotsStr)) slotsStr = [];
+  const slots = JSON.stringify(slotsStr);
   
   const stmt = db.prepare(`
     UPDATE courses
@@ -82,7 +94,7 @@ function updateCourse(id, updates) {
     WHERE id = ?
   `);
   
-  stmt.run(merged.name, merged.description, merged.image, slots, id);
+  stmt.run(merged.name || existing.name, merged.description || existing.description, merged.image || existing.image, slots, id);
   
   return getById(id);
 }
