@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>課程管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .fade-in { animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .slot-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            transition: all 0.2s;
+        }
+        .slot-pill:hover {
+            border-color: #d1d5db;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .slot-pill.full {
+            background: #fef2f2;
+            border-color: #fecaca;
+        }
+        .slot-pill.almost-full {
+            background: #fffbeb;
+            border-color: #fde68a;
+        }
+        .slot-pill.available {
+            background: #f0fdf4;
+            border-color: #bbf7d0;
+        }
+        .sync-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .sync-badge.loading { background: #fef3c7; color: #92400e; }
+        .sync-badge.success { background: #d1fae5; color: #065f46; }
+        .sync-badge.error { background: #fee2e2; color: #991b1b; }
+        .input-minimal {
+            background: transparent;
+            border: none;
+            text-align: center;
+            outline: none;
+            font-size: 14px;
+        }
+        .input-minimal:focus {
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 0 0 2px #dbeafe;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen py-8 px-4">
+
+    <div id="loginPanel" class="max-w-sm mx-auto mt-20">
+        <div class="bg-white rounded-2xl shadow-lg p-8 border border-gray-100">
+            <h1 class="text-xl font-bold text-gray-800 mb-4">管理員登入</h1>
+            <input type="password" id="adminPass" 
+                class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl text-base mb-4 focus:bg-white focus:border-gray-300"
+                placeholder="請輸入管理密碼">
+            <button onclick="doLogin()" 
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl">
+                登入
+            </button>
+            <p id="loginError" class="text-red-500 text-sm mt-3 hidden"></p>
+        </div>
+    </div>
+
+    <div id="mainPanel" class="max-w-4xl mx-auto hidden">
+        <header class="flex items-center justify-between mb-8 fade-in">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">課程管理</h1>
+                <p class="mt-1 text-gray-400 text-sm">管理預約系統的課程選項</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div id="syncStatus" class="sync-badge loading">
+                    <span class="animate-spin">⟳</span>
+                    等待同步
+                </div>
+                <button onclick="syncAllBookings()" id="syncBtn" class="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg text-sm font-medium transition-all">
+                    同步報名人數
+                </button>
+                <a href="/mgmt/services" class="text-gray-400 hover:text-gray-600 text-sm">返回服務</a>
+                <button onclick="doLogout()" class="text-gray-400 hover:text-gray-600 text-sm">登出</button>
+            </div>
+        </header>
+
+        <!-- Add Course Form -->
+        <div class="bg-white rounded-xl p-6 mb-6 border border-gray-100 fade-in">
+            <h3 class="font-bold text-gray-800 mb-4">新增課程</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input type="text" id="newCourseName" placeholder="課程名稱" 
+                    class="px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl">
+                <input type="text" id="newCourseImage" placeholder="圖片網址 (選填)" 
+                    class="px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl">
+            </div>
+            <textarea id="newCourseDesc" placeholder="課程說明" rows="2"
+                class="w-full mt-4 px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl"></textarea>
+            <button onclick="addCourse()" 
+                class="mt-4 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl">
+                新增課程
+            </button>
+        </div>
+
+        <!-- Courses List -->
+        <div id="coursesList" class="space-y-4">
+        </div>
+
+        <div id="toast" class="hidden fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl shadow-xl z-[300] font-bold text-white transition-all scale-0 opacity-0">
+        </div>
+    </div>
+
+    <script>
+        let coursesData = <%- JSON.stringify(courses) %>;
+        const isAdmin = <%- isAdmin %>;
+
+        function doLogin() {
+            const pass = document.getElementById('adminPass').value;
+            fetch('/api/services/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pass })
+            }).then(res => {
+                if (res.ok) {
+                    document.getElementById('loginPanel').classList.add('hidden');
+                    document.getElementById('mainPanel').classList.remove('hidden');
+                    render();
+                } else {
+                    document.getElementById('loginError').textContent = '密碼錯誤';
+                    document.getElementById('loginError').classList.remove('hidden');
+                }
+            });
+        }
+
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/services/login', { method: 'GET' });
+                if (res.ok) {
+                    document.getElementById('loginPanel').classList.add('hidden');
+                    document.getElementById('mainPanel').classList.remove('hidden');
+                    render();
+                }
+            } catch (e) {}
+        }
+
+        function doLogout() {
+            fetch('/api/services/logout', { method: 'POST' });
+            document.getElementById('loginPanel').classList.remove('hidden');
+            document.getElementById('mainPanel').classList.add('hidden');
+            document.getElementById('adminPass').value = '';
+        }
+
+        function render() {
+            const list = document.getElementById('coursesList');
+            list.innerHTML = '';
+            
+            coursesData.forEach((course, i) => {
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-xl border border-gray-100 p-5 fade-in';
+                card.style.animationDelay = `${i * 60}ms`;
+                
+                const slotsHtml = (course.slots || []).map((slot, idx) => {
+                    const booked = slot.booked || 0;
+                    const limit = slot.limit || 3;
+                    const remaining = limit - booked;
+                    let pillClass = 'available';
+                    let statusText = `剩${remaining}位`;
+                    if (booked >= limit) { pillClass = 'full'; statusText = '已額滿'; }
+                    else if (remaining <= 1) { pillClass = 'almost-full'; }
+                    return `
+                    <div class="slot-pill ${pillClass}">
+                        <input type="text" value="${slot.time}" placeholder="時段"
+                            onchange="updateSlot('${course.id}', ${idx}, 'time', this.value)"
+                            class="input-minimal w-12 text-gray-700 font-medium">
+                        <div class="flex items-center gap-1">
+                            <input type="number" value="${limit}" placeholder="名額"
+                                onchange="updateSlot('${course.id}', ${idx}, 'limit', parseInt(this.value) || 3)"
+                                class="input-minimal w-8 text-gray-600">
+                            <span class="text-gray-400 text-xs">上限</span>
+                        </div>
+                        <div class="w-px h-4 bg-gray-300"></div>
+                        <div class="flex items-center gap-1">
+                            <input type="number" value="${booked}" placeholder="已報名"
+                                onchange="updateSlot('${course.id}', ${idx}, 'booked', parseInt(this.value) || 0)"
+                                class="input-minimal w-8 text-gray-600">
+                            <span class="text-gray-400 text-xs">已報</span>
+                        </div>
+                        <span class="px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            booked >= limit ? 'bg-red-100 text-red-600' : 
+                            remaining <= 1 ? 'bg-amber-100 text-amber-600' : 
+                            'bg-green-100 text-green-600'
+                        }">${statusText}</span>
+                        <button onclick="removeSlot('${course.id}', ${idx})" class="ml-1 text-gray-400 hover:text-red-500 transition-colors">✕</button>
+                    </div>
+                `}).join('');
+                
+                card.innerHTML = `
+                    <div class="flex gap-4">
+                        <div class="w-20 h-20 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                            <img src="${course.image || 'https://placehold.co/200x200?text=Course'}" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/200x200?text=Course'">
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <input type="text" value="${course.name || ''}" placeholder="課程名稱"
+                                onchange="updateCourse('${course.id}', 'name', this.value)"
+                                class="font-bold text-lg text-gray-800 border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none w-full mb-1">
+                            <textarea placeholder="課程說明"
+                                onchange="updateCourse('${course.id}', 'description', this.value)"
+                                class="w-full text-sm text-gray-500 border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none resize-none" rows="2">${course.description || ''}</textarea>
+                            <input type="text" value="${course.image || ''}" placeholder="圖片網址"
+                                onchange="updateCourse('${course.id}', 'image', this.value)"
+                                class="mt-2 w-full text-xs text-gray-400 border-b border-transparent hover:border-gray-300 focus:border-blue-500 outline-none">
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <button onclick="deleteCourse('${course.id}')" class="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-600 rounded-lg text-sm font-medium">
+                                刪除
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-4 pt-4 border-t border-gray-100">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-gray-500">時段設定</span>
+                            <button onclick="addSlot('${course.id}')" class="px-2 py-1 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg text-xs font-medium">+ 新增時段</button>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            ${slotsHtml}
+                        </div>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+        }
+
+        async function addCourse() {
+            const name = document.getElementById('newCourseName').value.trim();
+            const desc = document.getElementById('newCourseDesc').value.trim();
+            const image = document.getElementById('newCourseImage').value.trim();
+            
+            console.log('=== addCourse start ===');
+            console.log('name:', name);
+            console.log('desc:', desc);
+            console.log('image:', image);
+            
+            if (!name) {
+                showToast('請輸入課程名稱', 'error');
+                return;
+            }
+            
+            const payload = { 
+                name, 
+                description: desc, 
+                image,
+                slots: [
+                    { time: '9:00', limit: 3, booked: 0 },
+                    { time: '13:00', limit: 3, booked: 0 },
+                    { time: '15:00', limit: 3, booked: 0 }
+                ]
+            };
+            console.log('payload:', JSON.stringify(payload));
+            
+            try {
+                const res = await fetch('/api/courses', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (res.ok) {
+                    const course = await res.json();
+                    coursesData.push(course);
+                    document.getElementById('newCourseName').value = '';
+                    document.getElementById('newCourseDesc').value = '';
+                    document.getElementById('newCourseImage').value = '';
+                    render();
+                    showToast('已新增課程', 'success');
+                } else {
+                    const err = await res.json();
+                    showToast(err.error || '新增失敗', 'error');
+                }
+            } catch (e) {
+                showToast('新增失敗', 'error');
+            }
+        }
+
+        async function updateCourse(id, field, value) {
+            try {
+                const res = await fetch(`/api/courses/${id}`);
+                if (!res.ok) return;
+                const fullCourse = await res.json();
+                
+                fullCourse[field] = value;
+                
+                await fetch(`/api/courses/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(fullCourse)
+                });
+                
+                const course = coursesData.find(c => c.id === id);
+                if (course) {
+                    Object.keys(fullCourse).forEach(key => {
+                        course[key] = fullCourse[key];
+                    });
+                }
+                showToast('已儲存', 'success');
+            } catch (e) {
+                showToast('儲存失敗', 'error');
+            }
+        }
+
+        async function addSlot(courseId) {
+            try {
+                const res = await fetch(`/api/courses/${courseId}`);
+                if (!res.ok) return;
+                const fullCourse = await res.json();
+                
+                if (!fullCourse.slots) fullCourse.slots = [];
+                fullCourse.slots.push({ time: '10:00', limit: 3, booked: 0 });
+                
+                await fetch(`/api/courses/${courseId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ slots: fullCourse.slots })
+                });
+                
+                const course = coursesData.find(c => c.id === courseId);
+                if (course) course.slots = fullCourse.slots;
+                render();
+                showToast('已新增時段', 'success');
+            } catch (e) {
+                showToast('新增失敗', 'error');
+            }
+        }
+
+        async function removeSlot(courseId, slotIndex) {
+            try {
+                const res = await fetch(`/api/courses/${courseId}`);
+                if (!res.ok) return;
+                const fullCourse = await res.json();
+                
+                fullCourse.slots.splice(slotIndex, 1);
+                
+                await fetch(`/api/courses/${courseId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ slots: fullCourse.slots })
+                });
+                
+                const course = coursesData.find(c => c.id === courseId);
+                if (course) course.slots = fullCourse.slots;
+                render();
+                showToast('已刪除時段', 'success');
+            } catch (e) {
+                showToast('刪除失敗', 'error');
+            }
+        }
+
+        async function updateSlot(courseId, slotIndex, field, value) {
+            try {
+                const res = await fetch(`/api/courses/${courseId}`);
+                if (!res.ok) return;
+                const fullCourse = await res.json();
+                
+                fullCourse.slots[slotIndex][field] = value;
+                
+                await fetch(`/api/courses/${courseId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ slots: fullCourse.slots })
+                });
+                
+                const course = coursesData.find(c => c.id === courseId);
+                if (course) course.slots = fullCourse.slots;
+                showToast('已儲存', 'success');
+            } catch (e) {
+                showToast('儲存失敗', 'error');
+            }
+        }
+
+        async function deleteCourse(id) {
+            if (!confirm('確定要刪除這個課程嗎？')) return;
+            
+            try {
+                await fetch(`/api/courses/${id}`, { method: 'DELETE' });
+                coursesData = coursesData.filter(c => c.id !== id);
+                render();
+                showToast('已刪除', 'success');
+            } catch (e) {
+                showToast('刪除失敗', 'error');
+            }
+        }
+
+        async function syncAllBookings() {
+            const btn = document.getElementById('syncBtn');
+            const status = document.getElementById('syncStatus');
+            btn.disabled = true;
+            btn.textContent = '同步中...';
+            status.className = 'sync-badge loading';
+            status.innerHTML = '<span class="animate-spin">⟳</span> 同步中...';
+
+            try {
+                const res = await fetch('/config');
+                const { URLBASE } = await res.json();
+
+                const scriptUrl = "https://script.google.com/macros/s/AKfycbyYMAW1pdigBwM6xlbuD9kJvnVMLWyt2rPcT0Mh9_Z_s8hnopvqJkh-D7znlmOUKf7f/exec";
+                const response = await fetch(`${scriptUrl}?action=getStats&t=${Date.now()}`);
+                const stats = await response.json();
+
+                let updatedCount = 0;
+                for (const course of coursesData) {
+                    for (const slot of (course.slots || [])) {
+                        const key = `${course.name}-${slot.time}`;
+                        if (stats[key] !== undefined) {
+                            slot.booked = parseInt(stats[key], 10);
+                            updatedCount++;
+                        }
+                    }
+                }
+
+                if (updatedCount > 0) {
+                    await fetch('/api/courses/batch-update', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ courses: coursesData })
+                    });
+                }
+
+                render();
+                status.className = 'sync-badge success';
+                status.innerHTML = '✓ 已同步';
+                showToast(`已同步 ${updatedCount} 個時段`, 'success');
+            } catch (e) {
+                status.className = 'sync-badge error';
+                status.innerHTML = '✕ 同步失敗';
+                showToast('同步失敗', 'error');
+            }
+
+            btn.disabled = false;
+            btn.textContent = '同步報名人數';
+            setTimeout(() => {
+                status.className = 'sync-badge success';
+                status.innerHTML = '✓ 已同步';
+            }, 3000);
+        }
+
+        function showToast(msg, type) {
+            const toast = document.getElementById('toast');
+            const colors = { success: 'bg-green-600', error: 'bg-red-600' };
+            toast.innerText = msg;
+            toast.className = `fixed top-4 left-1/2 -translate-x-1/2 px-6 py-3 rounded-xl shadow-xl z-[300] font-bold text-white transition-all scale-100 opacity-100 ${colors[type]}`;
+            setTimeout(() => {
+                toast.classList.replace('scale-100', 'scale-0');
+                toast.classList.replace('opacity-100', 'opacity-0');
+            }, 2000);
+        }
+
+        checkAuth();
+    </script>
+</body>
+</html>

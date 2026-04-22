@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const statistics = require('../utils/statistics');
 const statisticsRoutes = require('./statistics');
 const servicesLoader = require('../utils/services-loader');
+const coursesLoader = require('../utils/courses-loader');
 
 const router = express.Router();
 
@@ -69,6 +70,82 @@ router.get('/services', (req, res) => {
 
 router.get('/statistics', (req, res) => {
   res.render('statistics');
+});
+
+router.get('/mgmt/courses', (req, res) => {
+  const cookie = req.cookies[ADMIN_COOKIE];
+  const isAdmin = cookie === ADMIN_SECRET;
+  const courses = coursesLoader.getAllCourses();
+  res.render('admin/courses', { courses, isAdmin });
+});
+
+router.get('/api/courses', (req, res) => {
+  const courses = coursesLoader.getAllCourses();
+  res.json(courses);
+});
+
+router.post('/api/courses', (req, res) => {
+  const { name, description, image, slots } = req.body;
+  console.log('=== addCourse request ===');
+  console.log('name:', JSON.stringify(name));
+  console.log('description:', JSON.stringify(description));
+  console.log('image:', JSON.stringify(image));
+  console.log('slots:', JSON.stringify(slots));
+  
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: '名稱不可為空' });
+  }
+  const course = coursesLoader.addCourse({ name, description, image, slots: slots || [] });
+  console.log('course after addCourse:', JSON.stringify(course));
+  
+  if (!course) {
+    return res.status(400).json({ error: '新增失敗' });
+  }
+  res.json(course);
+});
+
+router.get('/api/courses/:id', (req, res) => {
+  const { id } = req.params;
+  const course = coursesLoader.getCourseById(id);
+  if (!course) {
+    return res.status(404).json({ error: '課程不存在' });
+  }
+  res.json(course);
+});
+
+router.put('/api/courses/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, description, image, slots } = req.body;
+  const course = coursesLoader.updateCourse(id, { name, description, image, slots });
+  if (!course) {
+    return res.status(404).json({ error: '課程不存在' });
+  }
+  res.json(course);
+});
+
+router.delete('/api/courses/:id', (req, res) => {
+  const { id } = req.params;
+  const success = coursesLoader.deleteCourse(id);
+  if (!success) {
+    return res.status(404).json({ error: '課程不存在' });
+  }
+  res.json({ success: true });
+});
+
+router.put('/api/courses/batch-update', (req, res) => {
+  const { courses } = req.body;
+  if (!courses || !Array.isArray(courses)) {
+    return res.status(400).json({ error: 'Invalid data' });
+  }
+  const config = coursesLoader.getCourses();
+  courses.forEach(update => {
+    const idx = config.courses.findIndex(c => c.id === update.id);
+    if (idx !== -1) {
+      config.courses[idx] = { ...config.courses[idx], ...update };
+    }
+  });
+  coursesLoader.saveCourses(config);
+  res.json({ success: true });
 });
 
 router.get('/api/services', (req, res) => {
