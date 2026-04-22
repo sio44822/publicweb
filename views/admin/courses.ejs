@@ -189,7 +189,7 @@
                     const remaining = limit - booked;
                     let pillClass = 'available';
                     let badgeClass = 'available';
-                    let statusText = `${remaining} 位`;
+                    let statusText = `剩${remaining}位`;
                     if (booked >= limit) { pillClass = 'full'; badgeClass = 'full'; statusText = '額滿'; }
                     else if (remaining <= 1) { pillClass = 'almost-full'; badgeClass = 'almost-full'; }
                     return `
