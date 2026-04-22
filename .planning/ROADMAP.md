@@ -4,44 +4,137 @@
 
 - ✅ **v1.0 Services Navigation** — Phase 1 (shipped 2026-04-21)
 - ✅ **v1.1 Enhanced Statistics** — (shipped 2026-04-22)
-- ○ **v1.2 Course Management** — Phase 2
+- ○ **v1.2 SQLite Database Migration** — (planned 2026-04-23)
 
 ---
 
-## Phase 2: Course Management
+## Phase 1: SQLite Setup & Schema Design
 
-**Status:** Planned
-**Planned:** 2026-04-23
-**Goal:** 管理員可新增/編輯/刪除課程，使用者可以預約課程
+**Status:** In Planning
+**Goal:** Set up SQLite database with proper schema
 
 ### Requirements
 
-- **D-01:** 管理員從 /mgmt/services 進入 /mgmt/courses
-- **D-02:** 維持極簡風格
-- **D-03:** Inline 編輯模式
-- **D-04:** 課程結構 { id, name, image, slots[{time, limit}] }
-- **D-05:** 固定時段
-- **D-06:** 從 /api/courses 讀取
-- **D-07:** 本地名額快速顯示
-- **D-08:** 提交前檢查名額
-- **D-09:** 寫入 Google Sheet
-- **D-10:** QR Code 工具維持
-- **D-11:** 單一 URL 輸入
+- DB-01: SQLite Database Setup
+- DB-02: Database Connection Layer
 
-### Research Findings
+### Success Criteria (what must be TRUE):
 
-Most functionality already implemented in codebase:
-- /mgmt/courses admin interface
-- /api/courses CRUD endpoints
-- views/1.ejs booking flow with Google Sheet sync
+1. SQLite database file created at `data/publicweb.db`
+2. Database initialization script runs without errors
+3. All required tables created (courses, services, statistics, daily_stats)
+4. Connection module handles errors gracefully
 
 ### Plans
 
-- [ ] 02-01-PLAN.md — Verification plan (4 checkpoints)
+**Plans:** 2 plans
+
+Plans:
+- [ ] 01-sqlite-setup/01-01-PLAN.md — SQLite connection layer setup
+- [ ] 01-sqlite-setup/01-02-PLAN.md — Database schema creation
 
 ---
 
-## v1.1 Enhanced Statistics (COMPLETED)
+## Phase 2: Courses Migration
+
+**Status:** Completed
+**Goal:** Migrate courses data from JSON to SQLite
+
+### Requirements
+
+- DB-03: Courses Migration
+
+### Success Criteria (what must be TRUE):
+
+1. Course data exported from `data/courses.json`
+2. All courses inserted into SQLite with correct schema
+3. Course slots migrated correctly
+4. Verification query returns same course count as JSON file
+
+### Plans
+
+**Plans:** 1 plan
+
+Plans:
+- [✅] 02-course-migration/02-01-PLAN.md — Courses migration and data access layer
+
+---
+
+## Phase 3: Statistics Migration
+
+**Status:** Not Started
+**Goal:** Migrate statistics data from JSON to SQLite
+
+### Requirements
+
+- DB-04: Statistics Migration
+
+### Success Criteria (what must be TRUE):
+
+1. Statistics records exported from JSON files
+2. All visit records inserted into SQLite
+3. Daily statistics migrated correctly
+4. Verification query returns same record count as JSON file
+
+### Plans
+
+TBD
+
+---
+
+## Phase 4: Services Migration & Data Access Layer
+
+**Status:** Not Started
+**Goal:** Migrate services and create new data access layer
+
+### Requirements
+
+- DB-05: Services Migration
+- DB-06: Course Data Access Layer
+- DB-07: Statistics Data Access Layer
+- DB-08: Services Data Access Layer
+
+### Success Criteria (what must be TRUE):
+
+1. Services migrated to SQLite
+2. Course repository provides CRUD operations
+3. Statistics repository provides record/query operations
+4. Services repository provides CRUD operations
+5. All repositories maintain API compatibility with existing loaders
+
+### Plans
+
+TBD
+
+---
+
+## Phase 5: Refactor & Verification
+
+**Status:** Not Started
+**Goal:** Refactor routes to use database and verify everything works
+
+### Requirements
+
+- DB-09: Refactor Routes to Use Database
+- DB-10: Verification & Testing
+
+### Success Criteria (what must be TRUE):
+
+1. Routes import and use new database modules
+2. All API endpoints return expected data
+3. No breaking changes to existing API contracts
+4. No data loss after migration
+5. Application runs without errors
+
+### Plans
+
+TBD
+
+---
+
+## Previous Milestones
+
+### v1.1 Enhanced Statistics (COMPLETED)
 
 <details>
 <summary>✅ v1.1 - SHIPPED 2026-04-22</summary>
@@ -55,6 +148,18 @@ Most functionality already implemented in codebase:
 
 </details>
 
+### v1.0 Services Navigation (COMPLETED)
+
+<details>
+<summary>✅ v1.0 - SHIPPED 2026-04-21</summary>
+
+- 服務導覽頁 (`/services/`) - 網格卡片響應式設計
+- 管理員頁面 (`/mgmt/services`) - 密碼保護、啟用/停用、排序、編輯
+- 服務設定驗證 - 名稱/連結必填、URL 格式檢查
+- 管理員密碼移至環境變數 (`ADMIN_PASSWORD`)
+
+</details>
+
 ---
 
-*Roadmap v1.1 shipped*
+*Roadmap v1.2 planned*

@@ -1,7 +1,8 @@
 # Project State: Service Navigation Layer
 
 **Project:** publicweb
-**Last Updated:** 2026-04-21
+**Milestone:** v1.2 SQLite Database Migration
+**Last Updated:** 2026-04-23
 
 ---
 
@@ -9,31 +10,85 @@
 
 | Metric | Value |
 |--------|-------|
-| Phase | 1 - Planning |
-| Health | 🟡 Planning |
-| Ready for Development | No |
+| Phase | 2 - In Progress |
+| Milestone | v1.2 SQLite Database Migration |
+| Health | 🟢 Complete |
+| Ready for Development | Yes |
+
+---
+
+## Current Position
+
+Phase: 2 - Courses Migration
+Plan: 02-01
+Status: Completed
+Last activity: 2026-04-23 — Plan 02-01 complete
 
 ---
 
 ## Phase Status
 
-### Phase 1: Services Navigation
+### Phase 1: SQLite Setup & Schema Design
 
 | Attribute | Value |
 |-----------|-------|
-| Status | Pre-discussed |
-| Context | `.planning/phases/01-services-nav/01-CONTEXT.md` |
-| Requirements | Defined in `REQUIREMENTS.md` |
-| Roadmap | Defined in `ROADMAP.md` |
+| Status | Not started |
+| Context | TBD |
+| Requirements | DB-01, DB-02 |
+| Roadmap | Defined in ROADMAP.md |
 | Ready | No |
 
 **Blocked By:**
-- None (pre-discussed, ready to plan)
+- None
 
 **Next Steps:**
-1. Define service data structure
-2. Create user navigation page (`/services/`)
-3. Create admin management page (`/mgmt/services`)
+1. Install SQLite dependency
+2. Create database initialization script
+3. Create connection module
+
+---
+
+### Phase 2: Courses Migration
+
+| Attribute | Value |
+|-----------|-------|
+| Status | ✅ Completed |
+| Dependencies | Phase 1 complete |
+| Requirements | DB-03 |
+| Ready | Yes |
+
+---
+
+### Phase 3: Statistics Migration
+
+| Attribute | Value |
+|-----------|-------|
+| Status | Not started |
+| Dependencies | Phase 1 complete |
+| Requirements | DB-04 |
+| Ready | No |
+
+---
+
+### Phase 4: Services Migration & Data Access Layer
+
+| Attribute | Value |
+|-----------|-------|
+| Status | Not started |
+| Dependencies | Phase 2, Phase 3 complete |
+| Requirements | DB-05, DB-06, DB-07, DB-08 |
+| Ready | No |
+
+---
+
+### Phase 5: Refactor & Verification
+
+| Attribute | Value |
+|-----------|-------|
+| Status | Not started |
+| Dependencies | Phase 4 complete |
+| Requirements | DB-09, DB-10 |
+| Ready | No |
 
 ---
 
@@ -41,16 +96,16 @@
 
 | Phase | Name | Priority | Dependencies |
 |-------|------|----------|--------------|
-| 2 | Service Configuration Persistence | P1 | Phase 1 complete |
-| 3 | Enhanced Admin Features | P2 | Phase 2 complete |
+| - | Course Management Features | P1 | v1.2 complete |
+| - | Enhanced Admin Features | P2 | v1.2 complete |
 
 ---
 
 ## Open Questions
 
-- [ ] Should authentication be added for admin route? (Phase 1 scope: no auth)
-- [ ] How to handle missing service icons?
-- [ ] Should we add service thumbnails/previews?
+- [ ] Which SQLite library to use? (`better-sqlite3` sync vs `sqlite3` async)
+- [ ] Keep JSON files as backup after migration?
+- [ ] Add migration rollback capability?
 
 ---
 
@@ -61,6 +116,7 @@
 | 2026-04-21 | Use `/mgmt/` prefix for admin routes | Phase 1 context |
 | 2026-04-21 | Keep coupon.ejs unchanged | Phase 1 context |
 | 2026-04-21 | Use file-based config for Phase 1 | Phase 1 context |
+| 2026-04-23 | Use SQLite for v1.2 migration | v1.2 context |
 
 ---
 
@@ -70,7 +126,8 @@
 |------|--------|
 | 2026-04-21 | Created project planning artifacts |
 | 2026-04-21 | Phase 1 marked as pre-discussed |
+| 2026-04-23 | Started milestone v1.2 SQLite Database Migration |
 
 ---
 
-*State updated: 2026-04-21*
+*State updated: 2026-04-23*
