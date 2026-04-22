@@ -1,10 +1,12 @@
 const express = require('express');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
+const db = require('../utils/db');
 const statistics = require('../utils/statistics');
 const statisticsRoutes = require('./statistics');
-const servicesLoader = require('../utils/services-loader');
-const coursesLoader = require('../utils/courses-loader');
+
+// Use db.statistics for recordVisit() - SQLite-based
+// Use statistics for startDailyCron() (still in utils/statistics)
 
 const router = express.Router();
 
@@ -40,19 +42,19 @@ router.get('/config', (req, res) => {
 
 router.get('/public/1', (req, res) => {
   const userId = getUserId(req, res);
-  statistics.recordVisit(userId, '/public/1');
+  db.statistics.recordVisit(userId, '/public/1');
   res.render('1');
 });
 
 router.get('/public/coupon', (req, res) => {
   const userId = getUserId(req, res);
-  statistics.recordVisit(userId, '/public/coupon');
+  db.statistics.recordVisit(userId, '/public/coupon');
   res.render('coupon');
 });
 
 router.get('/public/url-qr-doc-tool', (req, res) => {
   const userId = getUserId(req, res);
-  statistics.recordVisit(userId, '/public/url-qr-doc-tool');
+  db.statistics.recordVisit(userId, '/public/url-qr-doc-tool');
   res.render('url-qr-doc-tool');
 });
 
@@ -75,12 +77,12 @@ router.get('/statistics', (req, res) => {
 router.get('/mgmt/courses', (req, res) => {
   const cookie = req.cookies[ADMIN_COOKIE];
   const isAdmin = cookie === ADMIN_SECRET;
-  const courses = coursesLoader.getAllCourses();
+  const courses = db.courses.getAll();
   res.render('admin/courses', { courses, isAdmin });
 });
 
 router.get('/api/courses', (req, res) => {
-  const courses = coursesLoader.getAllCourses();
+  const courses = db.courses.getAll();
   res.json(courses);
 });
 
@@ -95,7 +97,7 @@ router.post('/api/courses', (req, res) => {
   if (!name || !name.trim()) {
     return res.status(400).json({ error: '名稱不可為空' });
   }
-  const course = coursesLoader.addCourse({ name, description, image, slots: slots || [] });
+  const course = db.courses.add({ name, description, image, slots: slots || [] });
   console.log('course after addCourse:', JSON.stringify(course));
   
   if (!course) {
@@ -106,7 +108,7 @@ router.post('/api/courses', (req, res) => {
 
 router.get('/api/courses/:id', (req, res) => {
   const { id } = req.params;
-  const course = coursesLoader.getCourseById(id);
+  const course = db.courses.getById(id);
   if (!course) {
     return res.status(404).json({ error: '課程不存在' });
   }
@@ -116,7 +118,7 @@ router.get('/api/courses/:id', (req, res) => {
 router.put('/api/courses/:id', (req, res) => {
   const { id } = req.params;
   const { name, description, image, slots } = req.body;
-  const course = coursesLoader.updateCourse(id, { name, description, image, slots });
+  const course = db.courses.updateCourse(id, { name, description, image, slots });
   if (!course) {
     return res.status(404).json({ error: '課程不存在' });
   }
@@ -125,7 +127,7 @@ router.put('/api/courses/:id', (req, res) => {
 
 router.delete('/api/courses/:id', (req, res) => {
   const { id } = req.params;
-  const success = coursesLoader.deleteCourse(id);
+  const success = db.courses.deleteCourse(id);
   if (!success) {
     return res.status(404).json({ error: '課程不存在' });
   }
@@ -137,27 +139,22 @@ router.put('/api/courses/batch-update', (req, res) => {
   if (!courses || !Array.isArray(courses)) {
     return res.status(400).json({ error: 'Invalid data' });
   }
-  const config = coursesLoader.getCourses();
   courses.forEach(update => {
-    const idx = config.courses.findIndex(c => c.id === update.id);
-    if (idx !== -1) {
-      config.courses[idx] = { ...config.courses[idx], ...update };
-    }
+    db.courses.updateCourse(update.id, update);
   });
-  coursesLoader.saveCourses(config);
   res.json({ success: true });
 });
 
 router.get('/api/services', (req, res) => {
-  const services = servicesLoader.getEnabledServices();
+  const services = db.services.getEnabled();
   res.json(services);
 });
 
 router.get('/mgmt/services', (req, res) => {
   const cookie = req.cookies[ADMIN_COOKIE];
   const isAdmin = cookie === ADMIN_SECRET;
-  const config = servicesLoader.getServices();
-  res.render('admin/services', { services: config.services, isAdmin });
+  const allServices = db.services.getAll();
+  res.render('admin/services', { services: allServices, isAdmin });
 });
 
 router.post('/api/services/update', (req, res) => {
@@ -165,11 +162,11 @@ router.post('/api/services/update', (req, res) => {
   if (!services || !Array.isArray(services)) {
     return res.status(400).json({ error: 'Invalid data' });
   }
-  const errors = servicesLoader.validateServices(services);
+  const errors = db.services.validateServices(services);
   if (errors.length > 0) {
     return res.status(400).json({ error: errors.join('; ') });
   }
-  servicesLoader.saveServices({ services });
+  db.services.saveServices({ services });
   res.json({ success: true });
 });
 
