@@ -43,13 +43,7 @@ router.get('/config', (req, res) => {
 router.get('/public/1', (req, res) => {
   const userId = getUserId(req, res);
   db.statistics.recordVisit(userId, '/public/1');
-  res.render('1');
-});
-
-router.get('/public/coupon', (req, res) => {
-  const userId = getUserId(req, res);
-  db.statistics.recordVisit(userId, '/public/coupon');
-  res.render('coupon');
+  res.render('coursereservation');
 });
 
 router.get('/public/url-qr-doc-tool', (req, res) => {
@@ -59,7 +53,7 @@ router.get('/public/url-qr-doc-tool', (req, res) => {
 });
 
 router.get('/public/11.html', (req, res) => {
-  res.render('1');
+  res.render('coursereservation');
 });
 
 router.get('/', (req, res) => {
@@ -115,6 +109,29 @@ router.get('/api/courses/:id', (req, res) => {
   res.json(course);
 });
 
+router.put('/api/courses/batch-update', (req, res) => {
+  const { courses } = req.body;
+  if (!courses || !Array.isArray(courses)) {
+    return res.status(400).json({ error: 'Invalid data' });
+  }
+  courses.forEach(update => {
+    db.courses.updateCourse(update.id, update);
+  });
+  res.json({ success: true });
+});
+
+router.post('/api/courses/sync', async (req, res) => {
+  console.log('[Sync] Starting sync from Google Sheet...');
+  try {
+    const updated = await refreshCourseBookingsFromGoogle();
+    console.log('[Sync] Completed, updated courses:', updated);
+    res.json({ success: true, updated });
+  } catch (err) {
+    console.error('[Sync] Error:', err);
+    res.status(500).json({ error: '同步失敗' });
+  }
+});
+
 router.put('/api/courses/:id', (req, res) => {
   const { id } = req.params;
   const { name, description, image, slots } = req.body;
@@ -134,15 +151,69 @@ router.delete('/api/courses/:id', (req, res) => {
   res.json({ success: true });
 });
 
-router.put('/api/courses/batch-update', (req, res) => {
-  const { courses } = req.body;
-  if (!courses || !Array.isArray(courses)) {
-    return res.status(400).json({ error: 'Invalid data' });
+router.post('/api/courses/book', async (req, res) => {
+  const { courseId, time, name, phone } = req.body;
+
+  if (!courseId || !time || !name || !phone) {
+    return res.status(400).json({ error: '缺少必要欄位' });
   }
-  courses.forEach(update => {
-    db.courses.updateCourse(update.id, update);
-  });
-  res.json({ success: true });
+
+  const courseIdNum = parseInt(courseId, 10);
+  console.log('[Book] courseId:', courseId, '-> parsed:', courseIdNum);
+  
+  const course = db.courses.getById(courseIdNum);
+  console.log('[Book] course found:', course ? course.name : 'NOT FOUND');
+  
+  if (!course) {
+    return res.status(404).json({ error: '課程不存在' });
+  }
+
+  const slot = (course.slots || []).find(s => s.time === time);
+  console.log('[Book] slot found:', slot);
+  
+  if (!slot) {
+    return res.status(404).json({ error: '時段不存在' });
+  }
+
+  const limit = slot.limit || 3;
+  const booked = slot.booked || 0;
+  console.log('[Book] limit:', limit, 'booked:', booked);
+
+  if (booked >= limit) {
+    return res.status(400).json({ error: '該時段名額已滿' });
+  }
+
+  try {
+    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyYMAW1pdigBwM6xlbuD9kJvnVMLWyt2rPcT0Mh9_Z_s8hnopvqJkh-D7znlmOUKf7f/exec';
+    const params = new URLSearchParams();
+    params.append('姓名', name);
+    params.append('電話', phone);
+    params.append('課程', course.name);
+    params.append('時段', time);
+    params.append('提交時間', new Date().toLocaleString());
+
+    fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      body: params,
+      mode: 'no-cors'
+    });
+
+    const newSlots = (course.slots || []).map(s => {
+      if (s.time === time) {
+        return { ...s, booked: (s.booked || 0) + 1 };
+      }
+      return s;
+    });
+    console.log('[Book] newSlots:', JSON.stringify(newSlots));
+    
+    const updated = db.courses.updateCourse(courseIdNum, { slots: newSlots });
+    console.log('[Book] update result:', updated ? 'SUCCESS' : 'FAILED');
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Booking error:', err);
+    res.status(500).json({ error: '預約失敗，請稍後再試' });
+  }
 });
 
 router.get('/api/services', (req, res) => {
@@ -174,6 +245,62 @@ const ADMIN_COOKIE = 'services_admin';
 const ADMIN_SECRET = 'publicweb-services-2024';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '28345013';
 
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyYMAW1pdigBwM6xlbuD9kJvnVMLWyt2rPcT0Mh9_Z_s8hnopvqJkh-D7znlmOUKf7f/exec';
+
+async function fetchGoogleSheetStats() {
+  try {
+    const url = `${GOOGLE_SCRIPT_URL}?action=getStats&t=${Date.now()}`;
+    console.log('[fetchGoogleSheetStats] URL:', url);
+    const res = await fetch(url);
+    const json = await res.json();
+    console.log('[fetchGoogleSheetStats] Raw response:', JSON.stringify(json));
+    return json;
+  } catch (e) {
+    console.error('Failed to fetch Google Sheet stats:', e);
+    return null;
+  }
+}
+
+async function refreshCourseBookingsFromGoogle() {
+  console.log('[refreshCourseBookingsFromGoogle] Fetching from Google Sheet...');
+  const stats = await fetchGoogleSheetStats();
+  console.log('[refreshCourseBookingsFromGoogle] Stats received:', JSON.stringify(stats));
+  if (!stats) return false;
+
+  const courses = db.courses.getAll();
+  console.log('[refreshCourseBookingsFromGoogle] Local courses:', courses.length);
+  console.log('[refreshCourseBookingsFromGoogle] Google Sheet keys:', Object.keys(stats));
+  let updated = 0;
+
+  for (const course of courses) {
+    let needsUpdate = false;
+    const newSlots = (course.slots || []).map(slot => {
+      const key = `${course.name}-${slot.time}`;
+      console.log(`[refreshCourseBookingsFromGoogle] Checking key: "${key}", value: ${stats[key]}`);
+      // 没数据时重置为 0
+      const googleBooked = (stats[key] !== undefined && stats[key] !== null) 
+        ? parseInt(stats[key], 10) 
+        : 0;
+      
+      if (slot.booked !== googleBooked && !isNaN(googleBooked)) {
+        needsUpdate = true;
+        console.log(`[refreshCourseBookingsFromGoogle] Will update: ${key} from ${slot.booked} to ${googleBooked}`);
+        return { ...slot, booked: googleBooked };
+      }
+      return slot;
+    });
+
+    if (needsUpdate) {
+      console.log(`[refreshCourseBookingsFromGoogle] Updating course: ${course.name}`);
+      db.courses.updateCourse(course.id, { slots: newSlots });
+      updated++;
+    }
+  }
+
+  console.log('[refreshCourseBookingsFromGoogle] Total updated:', updated);
+  return updated;
+}
+
 router.get('/api/services/login', (req, res) => {
   const cookie = req.cookies[ADMIN_COOKIE];
   if (cookie === ADMIN_SECRET) {
@@ -196,5 +323,14 @@ router.post('/api/services/logout', (req, res) => {
   res.clearCookie(ADMIN_COOKIE);
   res.json({ ok: true });
 });
+
+setTimeout(() => {
+  console.log('[Startup] Syncing course bookings from Google Sheet...');
+  refreshCourseBookingsFromGoogle().then(updated => {
+    console.log(`[Startup] Sync completed, updated: ${updated}`);
+  }).catch(err => {
+    console.error('[Startup] Sync failed:', err);
+  });
+}, 2000);
 
 module.exports = router;

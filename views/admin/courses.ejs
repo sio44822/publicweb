@@ -97,9 +97,9 @@
                 <p class="mt-1 text-gray-400 text-sm">管理預約系統的課程選項</p>
             </div>
             <div class="flex items-center gap-4">
-                <div id="syncStatus" class="sync-badge loading">
-                    <span class="animate-spin">⟳</span>
-                    等待同步
+                <div id="syncStatus" class="sync-badge success">
+                    <span>✓</span>
+                    <span id="syncTime">--:--:--</span>
                 </div>
                 <button onclick="syncAllBookings()" id="syncBtn" class="px-3 py-1.5 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-lg text-sm font-medium transition-all">
                     同步報名人數
@@ -279,8 +279,9 @@
                 });
                 
                 if (res.ok) {
-                    const course = await res.json();
-                    coursesData.push(course);
+                    // 重新获取最新课程列表
+                    const coursesRes = await fetch('/api/courses');
+                    coursesData = await coursesRes.json();
                     document.getElementById('newCourseName').value = '';
                     document.getElementById('newCourseDesc').value = '';
                     document.getElementById('newCourseImage').value = '';
@@ -309,12 +310,10 @@
                     body: JSON.stringify(fullCourse)
                 });
                 
-                const course = coursesData.find(c => c.id === id);
-                if (course) {
-                    Object.keys(fullCourse).forEach(key => {
-                        course[key] = fullCourse[key];
-                    });
-                }
+                // 重新获取最新课程列表
+                const coursesRes = await fetch('/api/courses');
+                coursesData = await coursesRes.json();
+                render();
                 showToast('已儲存', 'success');
             } catch (e) {
                 showToast('儲存失敗', 'error');
@@ -336,8 +335,9 @@
                     body: JSON.stringify({ slots: fullCourse.slots })
                 });
                 
-                const course = coursesData.find(c => c.id === courseId);
-                if (course) course.slots = fullCourse.slots;
+                // 重新获取最新课程列表
+                const coursesRes = await fetch('/api/courses');
+                coursesData = await coursesRes.json();
                 render();
                 showToast('已新增時段', 'success');
             } catch (e) {
@@ -359,8 +359,9 @@
                     body: JSON.stringify({ slots: fullCourse.slots })
                 });
                 
-                const course = coursesData.find(c => c.id === courseId);
-                if (course) course.slots = fullCourse.slots;
+                // 重新获取最新课程列表
+                const coursesRes = await fetch('/api/courses');
+                coursesData = await coursesRes.json();
                 render();
                 showToast('已刪除時段', 'success');
             } catch (e) {
@@ -382,8 +383,10 @@
                     body: JSON.stringify({ slots: fullCourse.slots })
                 });
                 
-                const course = coursesData.find(c => c.id === courseId);
-                if (course) course.slots = fullCourse.slots;
+                // 重新获取最新课程列表
+                const coursesRes = await fetch('/api/courses');
+                coursesData = await coursesRes.json();
+                render();
                 showToast('已儲存', 'success');
             } catch (e) {
                 showToast('儲存失敗', 'error');
@@ -395,7 +398,9 @@
             
             try {
                 await fetch(`/api/courses/${id}`, { method: 'DELETE' });
-                coursesData = coursesData.filter(c => c.id !== id);
+                // 重新获取最新课程列表
+                const coursesRes = await fetch('/api/courses');
+                coursesData = await coursesRes.json();
                 render();
                 showToast('已刪除', 'success');
             } catch (e) {
@@ -403,57 +408,47 @@
             }
         }
 
-        async function syncAllBookings() {
+        async function syncAllBookings(isAutoSync = false) {
             const btn = document.getElementById('syncBtn');
             const status = document.getElementById('syncStatus');
-            btn.disabled = true;
-            btn.textContent = '同步中...';
+
+            if (!isAutoSync) {
+                btn.disabled = true;
+                btn.textContent = '同步中...';
+            }
             status.className = 'sync-badge loading';
             status.innerHTML = '<span class="animate-spin">⟳</span> 同步中...';
 
             try {
-                const res = await fetch('/config');
-                const { URLBASE } = await res.json();
+                const res = await fetch('/api/courses/sync', { method: 'POST' });
+                if (!res.ok) throw new Error('Sync failed');
+                
+                const result = await res.json();
+                console.log('Sync result:', result);
 
-                const scriptUrl = "https://script.google.com/macros/s/AKfycbyYMAW1pdigBwM6xlbuD9kJvnVMLWyt2rPcT0Mh9_Z_s8hnopvqJkh-D7znlmOUKf7f/exec";
-                const response = await fetch(`${scriptUrl}?action=getStats&t=${Date.now()}`);
-                const stats = await response.json();
-
-                let updatedCount = 0;
-                for (const course of coursesData) {
-                    for (const slot of (course.slots || [])) {
-                        const key = `${course.name}-${slot.time}`;
-                        if (stats[key] !== undefined) {
-                            slot.booked = parseInt(stats[key], 10);
-                            updatedCount++;
-                        }
-                    }
-                }
-
-                if (updatedCount > 0) {
-                    await fetch('/api/courses/batch-update', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ courses: coursesData })
-                    });
-                }
+                const coursesRes = await fetch('/api/courses');
+                const courses = await coursesRes.json();
+                coursesData = courses;
 
                 render();
                 status.className = 'sync-badge success';
-                status.innerHTML = '✓ 已同步';
-                showToast(`已同步 ${updatedCount} 個時段`, 'success');
+                const now = new Date();
+                const timeStr = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+                status.innerHTML = `<span>✓</span><span id="syncTime">${timeStr}</span>`;
+                if (!isAutoSync) {
+                    showToast(`已同步 ${result.updated || 0} 個時段`, 'success');
+                }
             } catch (e) {
+                console.error('Sync error:', e);
                 status.className = 'sync-badge error';
-                status.innerHTML = '✕ 同步失敗';
-                showToast('同步失敗', 'error');
+                status.innerHTML = '<span>✕</span> 同步失敗';
+                if (!isAutoSync) {
+                    showToast('同步失敗', 'error');
+                }
             }
 
             btn.disabled = false;
             btn.textContent = '同步報名人數';
-            setTimeout(() => {
-                status.className = 'sync-badge success';
-                status.innerHTML = '✓ 已同步';
-            }, 3000);
         }
 
         function showToast(msg, type) {

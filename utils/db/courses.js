@@ -5,12 +5,24 @@ const { get } = require('./connection');
  * Get all courses from database
  * @returns {Array} Array of course objects
  */
+function parseSlots(slotsStr) {
+  if (!slotsStr) return [];
+  let result = slotsStr;
+  if (typeof result === 'string') {
+    try { result = JSON.parse(result); } catch { return []; }
+  }
+  while (typeof result === 'string') {
+    try { result = JSON.parse(result); } catch { break; }
+  }
+  return Array.isArray(result) ? result : [];
+}
+
 function getAll() {
   const db = get();
   const courses = db.prepare('SELECT * FROM courses ORDER BY id').all();
   return courses.map(course => ({
     ...course,
-    slots: JSON.parse(course.slots || '[]')
+    slots: parseSlots(course.slots)
   }));
 }
 
@@ -25,7 +37,7 @@ function getById(id) {
   if (!course) return null;
   return {
     ...course,
-    slots: JSON.parse(course.slots || '[]')
+    slots: parseSlots(course.slots)
   };
 }
 

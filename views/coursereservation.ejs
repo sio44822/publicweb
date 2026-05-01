@@ -90,7 +90,6 @@
                         <div class="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center font-bold shadow-lg shadow-blue-200">2</div>
                         <h2 class="text-2xl font-bold text-gray-800">選擇課程與時段</h2>
                     </div>
-                    <span id="syncStatus" class="text-[10px] font-bold text-amber-600 bg-amber-50 px-3 py-1 rounded-full animate-pulse border border-amber-100">正在讀取最新名額...</span>
                 </div>
                 
                 <div id="courseContainer" class="space-y-6">
@@ -136,16 +135,13 @@
 
     <script>
         let URLBASE = '';
-        let SCRIPT_URL = '';
         let appData, selectedChoice;
-        const MAX_SEATS = 3;
 
         async function loadConfig() {
             try {
                 const res = await fetch('/config');
                 const data = await res.json();
                 URLBASE = data.URLBASE;
-                SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyYMAW1pdigBwM6xlbuD9kJvnVMLWyt2rPcT0Mh9_Z_s8hnopvqJkh-D7znlmOUKf7f/exec";
                 console.log('URLBASE:', URLBASE);
                 console.log('Mode:', data.mode);
                 await initApp();
@@ -159,26 +155,18 @@
                 const res = await fetch('/api/courses');
                 if (!res.ok) throw new Error('Failed to load courses');
                 const courses = await res.json();
-                
-                const cached = JSON.parse(localStorage.getItem('courseBooked') || '{}');
-                const cacheTime = localStorage.getItem('courseBookedTime');
-                const isCacheValid = cacheTime && (Date.now() - parseInt(cacheTime) < 60000);
-                
+
                 const data = {};
                 courses.forEach(c => {
                     data[c.id] = {
                         name: c.name,
                         image: c.image,
                         desc: c.description,
-                        slots: (c.slots || []).map(s => {
-                            const key = `${c.id}-${s.time}`;
-                            const booked = isCacheValid && cached[key] !== undefined ? cached[key] : 0;
-                            return {
-                                time: s.time,
-                                limit: s.limit || 3,
-                                booked: booked
-                            };
-                        })
+                        slots: (c.slots || []).map(s => ({
+                            time: s.time,
+                            limit: s.limit || 3,
+                            booked: s.booked || 0
+                        }))
                     };
                 });
                 return data;
@@ -209,8 +197,6 @@
             selectedChoice = null;
 
             document.getElementById('courseSection').classList.remove('loading-overlay');
-            document.getElementById('syncStatus').innerText = `本地資料`;
-            document.getElementById('syncStatus').className = `text-[10px] font-bold px-3 py-1 rounded-full border text-gray-400 bg-gray-50 border-gray-100`;
 
             const btn = document.getElementById('userSubmitBtn');
             btn.disabled = false;
@@ -227,10 +213,11 @@
             Object.entries(appData).forEach(([cid, data]) => {
                 const card = document.createElement('div');
                 card.className = 'bg-white border-2 border-gray-50 rounded-[1.5rem] overflow-hidden shadow-sm p-4 md:p-6';
-                
+
                 let slotsGrid = '';
                 data.slots.forEach((s, idx) => {
                     const full = s.booked >= s.limit;
+                    console.log(`Render slot: cid=${cid}, time=${s.time}, booked=${s.booked}, limit=${s.limit}, full=${full}`);
                     slotsGrid += `
                         <div onclick="pickSlot('${cid}', ${idx}, this)" 
                              class="slot-card border-2 rounded-2xl py-4 px-2 cursor-pointer text-center transition-all active:scale-95 flex flex-col justify-center items-center ${full ? 'full' : 'border-gray-100 hover:border-blue-300 hover:bg-blue-50/50'}">
@@ -285,57 +272,47 @@
             if (!selectedChoice) return showToast("🎯 請選擇預約課程", "error");
 
             const slot = appData[selectedChoice.cid].slots[selectedChoice.idx];
-            const key = `${selectedChoice.courseName}-${selectedChoice.time}`;
+            if (slot.booked >= slot.limit) {
+                return showToast("❌ 該時段名額已滿", "error");
+            }
 
-            showToast("⌛ 檢查名額中...", "info");
             const btn = document.getElementById('userSubmitBtn');
             btn.disabled = true;
-            btn.innerHTML = `<span>檢查名額...</span>`;
+            btn.innerHTML = `<span>傳送預約中...</span>`;
 
             try {
-                const res = await fetch(`${SCRIPT_URL}?action=getStats&t=${Date.now()}`);
-                const stats = await res.json();
-                const currentBooked = parseInt(stats[key] || '0', 10);
-
-                if (currentBooked >= slot.limit) {
-                    showToast("❌ 抱歉，該時段名額已滿", "error");
-                    slot.booked = slot.limit;
-                    render();
-                    btn.disabled = false;
-                    btn.innerHTML = `<span>確認預約</span><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>`;
-                    return;
-                }
-
-                slot.booked = currentBooked + 1;
-
-                const params = new URLSearchParams();
-                params.append('姓名', name);
-                params.append('電話', phone);
-                params.append('課程', selectedChoice.courseName);
-                params.append('時段', selectedChoice.time);
-                params.append('提交時間', new Date().toLocaleString());
-
-                btn.innerHTML = `<span>傳送預約中...</span>`;
-
-                await fetch(SCRIPT_URL, {
+                const res = await fetch('/api/courses/book', {
                     method: 'POST',
-                    body: params,
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        courseId: selectedChoice.cid,
+                        time: selectedChoice.time,
+                        name: name,
+                        phone: phone
+                    })
                 });
 
-                const newCached = JSON.parse(localStorage.getItem('courseBooked') || '{}');
-                newCached[`${selectedChoice.cid}-${selectedChoice.time}`] = slot.booked;
-                localStorage.setItem('courseBooked', JSON.stringify(newCached));
-                localStorage.setItem('courseBookedTime', Date.now().toString());
+                console.log('Booking response status:', res.status);
+                
+                if (!res.ok) {
+                    const result = await res.json();
+                    throw new Error(result.error || '預約失敗');
+                }
 
-                document.getElementById('summaryName').innerText = name;
-                document.getElementById('summaryCourse').innerText = `${selectedChoice.courseName} (${selectedChoice.time})`;
-                document.getElementById('bookingForm').classList.add('hidden');
+                const result = await res.json();
+                console.log('Booking result:', result);
+
+                btn.innerHTML = `<span>完成</span>`;
+                
+                document.getElementById('summaryName').textContent = name;
+                document.getElementById('summaryCourse').textContent = `${selectedChoice.courseName} (${selectedChoice.time})`;
+                document.getElementById('bookingForm').style.display = 'none';
                 document.getElementById('successSection').classList.remove('hidden');
+                document.getElementById('successSection').style.display = 'block';
                 showToast("✅ 預約提交成功！", "success");
             } catch (err) {
-                showToast("❌ 提交失敗，請重新嘗試", "error");
+                console.error('Booking error:', err);
+                showToast(err.message || "❌ 提交失敗，請重新嘗試", "error");
                 btn.disabled = false;
                 btn.innerHTML = `<span>確認預約</span><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>`;
             }
