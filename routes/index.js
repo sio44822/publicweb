@@ -8,7 +8,6 @@ const router = express.Router();
 
 const isDev = process.env.NODE_ENV === 'development';
 const PORT = process.env.PORT || 80;
-console.log("🚀 ~ PORT:", PORT)
 
 const URLBASE = isDev 
   ? `http://localhost:${PORT}` 
