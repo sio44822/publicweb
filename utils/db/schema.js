@@ -30,17 +30,10 @@ const createTables = () => {
       icon TEXT,
       order_number INTEGER DEFAULT 0,
       enabled INTEGER DEFAULT 1,
-      show_in_nav INTEGER DEFAULT 1,
       created_at INTEGER DEFAULT (strftime('%s', 'now')),
       updated_at INTEGER DEFAULT (strftime('%s', 'now'))
     )
   `);
-  
-  // Migration: ensure show_in_nav column exists and has default value
-  try { 
-    db.exec(`ALTER TABLE services ADD COLUMN show_in_nav INTEGER DEFAULT 1`); 
-    db.exec(`UPDATE services SET show_in_nav = 1 WHERE show_in_nav IS NULL`);
-  } catch (e) {}
   
   // Statistics table
   db.exec(`

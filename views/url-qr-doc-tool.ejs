@@ -17,15 +17,11 @@
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen p-4 md:p-8">
-    <% if (navServices && navServices.length > 0) { %>
-    <div class="max-w-4xl mx-auto mb-4 flex justify-center gap-2 flex-wrap">
-        <% navServices.forEach(function(svc) { %>
-        <a href="<%= svc.url %>" class="px-4 py-2 rounded-full text-sm font-medium <%= currentPath === svc.url ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300' %>">
-            <%= svc.icon || '' %> <%= svc.name %>
-        </a>
-        <% }); %>
+    <div class="max-w-4xl mx-auto mb-4 flex justify-center gap-2">
+        <a href="/public/coursereservation" class="px-4 py-2 rounded-full text-sm font-medium bg-gray-200 text-gray-600 hover:bg-gray-300">📚 課程預約</a>
+        <a href="/public/coupon" class="px-4 py-2 rounded-full text-sm font-medium bg-gray-200 text-gray-600 hover:bg-gray-300">🎟️ 優惠券</a>
+        <a href="/public/url-qr-doc-tool" class="px-4 py-2 rounded-full text-sm font-medium bg-blue-600 text-white">🔗 URL工具</a>
     </div>
-    <% } %>
     <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
         <div class="p-6 border-b border-gray-100 bg-indigo-600">
             <h1 class="text-2xl font-bold text-white flex items-center gap-2">
