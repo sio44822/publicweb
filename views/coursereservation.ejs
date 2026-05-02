@@ -272,6 +272,7 @@
             if (!selectedChoice) return showToast("🎯 請選擇預約課程", "error");
 
             const slot = appData[selectedChoice.cid].slots[selectedChoice.idx];
+            console.log('Attempting to book slot:', slot);
             if (slot.booked >= slot.limit) {
                 return showToast("❌ 該時段名額已滿", "error");
             }
