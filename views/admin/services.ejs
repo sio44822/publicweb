@@ -58,9 +58,37 @@
         <div class="bg-white rounded-xl border border-gray-100 overflow-hidden fade-in">
             <div class="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
                 <span class="font-bold text-gray-700">服務列表</span>
-                <span class="text-xs text-gray-400">點擊名稱可快速編輯</span>
+                <button onclick="openAddModal()" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg">+ 新增</button>
             </div>
             <div id="servicesList"></div>
+        </div>
+    </div>
+
+    <div id="addModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-[400] p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-xl font-bold mb-4">新增服務</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">名稱</label>
+                    <input type="text" id="addName" class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl" placeholder="服務名稱">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">說明</label>
+                    <input type="text" id="addDesc" class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl" placeholder="服務說明">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">網址</label>
+                    <input type="text" id="addUrl" class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl" placeholder="/public/xxx">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 mb-1">圖示</label>
+                    <input type="text" id="addIcon" class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl" placeholder="📁">
+                </div>
+            </div>
+            <div class="flex gap-2 mt-6">
+                <button onclick="addService()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl">新增</button>
+                <button onclick="closeAddModal()" class="px-5 bg-gray-200 hover:bg-gray-300 text-gray-600 font-bold py-3 rounded-xl">取消</button>
+            </div>
         </div>
     </div>
 
@@ -114,9 +142,11 @@
                     <button onclick="moveOrder('${svc.id}', 1)" class="p-1 text-gray-400 hover:text-gray-600 ${i === sorted.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}">↓</button>
                     <span class="text-xl">${svc.icon || '📁'}</span>
                     <input type="text" value="${svc.name}" onchange="quickEdit('${svc.id}', 'name', this.value)" 
-                        class="flex-1 px-2 py-1 bg-transparent border-none font-medium text-gray-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 rounded editable">
+                        class="w-24 px-2 py-1 bg-transparent border-none font-medium text-gray-800 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 rounded editable">
                     <input type="text" value="${svc.description || ''}" onchange="quickEdit('${svc.id}', 'description', this.value)" 
-                        placeholder="說明" class="flex-1 px-2 py-1 bg-transparent border-none text-sm text-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 rounded">
+                        placeholder="說明" class="w-20 px-2 py-1 bg-transparent border-none text-sm text-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 rounded">
+                    <input type="text" value="${svc.url || ''}" onchange="quickEdit('${svc.id}', 'url', this.value)" 
+                        placeholder="路徑" class="w-28 px-2 py-1 bg-transparent border-none text-xs text-blue-500 focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-500 rounded">
                     <button onclick="toggleShowInNav('${svc.id}')" class="px-2 py-1 rounded-full text-xs font-bold ${svc.showInNav !== false ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-400'}" title="是否在導航列顯示">
                         ${svc.showInNav !== false ? '顯示' : '隱藏'}
                     </button>
@@ -174,6 +204,46 @@
             document.getElementById('mainPanel').classList.remove('hidden');
         }
         checkAuth();
+
+        function openAddModal() {
+            document.getElementById('addName').value = '';
+            document.getElementById('addDesc').value = '';
+            document.getElementById('addUrl').value = '';
+            document.getElementById('addIcon').value = '📁';
+            document.getElementById('addModal').classList.remove('hidden');
+        }
+
+        function closeAddModal() {
+            document.getElementById('addModal').classList.add('hidden');
+        }
+
+        async function addService() {
+            const name = document.getElementById('addName').value.trim();
+            const description = document.getElementById('addDesc').value.trim();
+            const url = document.getElementById('addUrl').value.trim();
+            const icon = document.getElementById('addIcon').value.trim();
+            
+            if (!name || !url) {
+                alert('名稱和網址必填');
+                return;
+            }
+            
+            const maxOrder = Math.max(...servicesData.map(s => s.order || 0), 0);
+            const newService = {
+                id: 'svc_' + Date.now(),
+                name,
+                description,
+                url,
+                icon: icon || '📁',
+                order: maxOrder + 1,
+                enabled: true,
+                showInNav: true
+            };
+            
+            servicesData.push(newService);
+            await saveData();
+            closeAddModal();
+        }
     </script>
 </body>
 </html>
