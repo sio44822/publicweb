@@ -51,11 +51,15 @@
 </head>
 <body class="bg-slate-50 min-h-screen py-6 px-4 md:py-12">
 
-    <div class="max-w-4xl mx-auto mb-4 flex justify-center gap-2">
-        <a href="/public/coursereservation" class="px-4 py-2 rounded-full text-sm font-medium bg-blue-600 text-white">📚 課程預約</a>
-        <a href="/public/coupon" class="px-4 py-2 rounded-full text-sm font-medium bg-gray-200 text-gray-600 hover:bg-gray-300">🎟️ 優惠券</a>
-        <a href="/public/url-qr-doc-tool" class="px-4 py-2 rounded-full text-sm font-medium bg-gray-200 text-gray-600 hover:bg-gray-300">🔗 URL工具</a>
+    <% if (navServices && navServices.length > 0) { %>
+    <div class="max-w-4xl mx-auto mb-4 flex justify-center gap-2 flex-wrap">
+        <% navServices.forEach(function(svc) { %>
+        <a href="<%= svc.url %>" class="px-4 py-2 rounded-full text-sm font-medium <%= currentPath === svc.url ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300' %>">
+            <%= svc.icon || '' %> <%= svc.name %>
+        </a>
+        <% }); %>
     </div>
+    <% } %>
 
     <div class="max-w-4xl mx-auto bg-white rounded-[2rem] shadow-2xl overflow-hidden relative border border-gray-100">
         
