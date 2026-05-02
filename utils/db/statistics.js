@@ -199,6 +199,164 @@ function migrateFromJson() {
   console.log('[Statistics Migration] Migration complete');
 }
 
+function getDailyStatistics() {
+  return getDailyStats();
+}
+
+function getTodayPageStats(page) {
+  const db = get();
+  const hkDate = getHongKongDateString();
+  const todayStart = new Date(hkDate + 'T00:00:00+08:00');
+  const todayEnd = new Date(hkDate + 'T23:59:59+08:00');
+  const startTimestamp = Math.floor(todayStart.getTime() / 1000);
+  const endTimestamp = Math.floor(todayEnd.getTime() / 1000);
+  
+  const result = db.prepare(`
+    SELECT COUNT(*) as visits, COUNT(DISTINCT userId) as userCount
+    FROM statistics
+    WHERE pagePath = ? AND timestamp >= ? AND timestamp <= ?
+  `).get(page, startTimestamp, endTimestamp);
+  
+  return { date: hkDate, page, visits: result.visits, userCount: result.userCount };
+}
+
+function getPageDailyTrend(page, days = 7) {
+  const db = get();
+  const results = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(Date.now() + 8 * 60 * 60 * 1000 - i * 24 * 60 * 60 * 1000);
+    const hkDate = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+    const startTimestamp = Math.floor(new Date(hkDate + 'T00:00:00+08:00').getTime() / 1000);
+    const endTimestamp = Math.floor(new Date(hkDate + 'T23:59:59+08:00').getTime() / 1000);
+    
+    const result = db.prepare(`
+      SELECT COUNT(*) as visits, COUNT(DISTINCT userId) as userCount
+      FROM statistics
+      WHERE pagePath = ? AND timestamp >= ? AND timestamp <= ?
+    `).get(page, startTimestamp, endTimestamp);
+    
+    results.push({ date: hkDate, visits: result.visits, userCount: result.userCount });
+  }
+  return results;
+}
+
+function getUserTrend(days = 7) {
+  const db = get();
+  const results = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = new Date(Date.now() + 8 * 60 * 60 * 1000 - i * 24 * 60 * 60 * 1000);
+    const hkDate = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+    const startTimestamp = Math.floor(new Date(hkDate + 'T00:00:00+08:00').getTime() / 1000);
+    const endTimestamp = Math.floor(new Date(hkDate + 'T23:59:59+08:00').getTime() / 1000);
+    
+    const result = db.prepare(`
+      SELECT COUNT(*) as visits, COUNT(DISTINCT userId) as userCount
+      FROM statistics
+      WHERE timestamp >= ? AND timestamp <= ?
+    `).get(startTimestamp, endTimestamp);
+    
+    results.push({ date: hkDate, visits: result.visits, userCount: result.userCount });
+  }
+  return results;
+}
+
+function getWeekTrend() {
+  return getUserTrend(7);
+}
+
+function getMonthTrend() {
+  return getUserTrend(30);
+}
+
+function getPageHourTrend(page, hours = 24) {
+  const db = get();
+  const now = Date.now() + 8 * 60 * 60 * 1000;
+  const results = [];
+  
+  for (let i = hours - 1; i >= 0; i--) {
+    const hourStart = new Date(now - i * 60 * 60 * 1000);
+    const hourEnd = new Date(now - (i - 1) * 60 * 60 * 1000);
+    const startTimestamp = Math.floor(hourStart.getTime() / 1000);
+    const endTimestamp = Math.floor(hourEnd.getTime() / 1000);
+    
+    const result = db.prepare(`
+      SELECT COUNT(*) as visits
+      FROM statistics
+      WHERE pagePath = ? AND timestamp >= ? AND timestamp < ?
+    `).get(page, startTimestamp, endTimestamp);
+    
+    results.push({ hour: hourStart.getUTCHours(), visits: result.visits });
+  }
+  return results;
+}
+
+function getFilteredDailyStats(date) {
+  const db = get();
+  const startTimestamp = Math.floor(new Date(date + 'T00:00:00+08:00').getTime() / 1000);
+  const endTimestamp = Math.floor(new Date(date + 'T23:59:59+08:00').getTime() / 1000);
+  
+  const results = db.prepare(`
+    SELECT pagePath, COUNT(*) as visits, COUNT(DISTINCT userId) as userCount
+    FROM statistics
+    WHERE timestamp >= ? AND timestamp <= ?
+    GROUP BY pagePath
+  `).all(startTimestamp, endTimestamp);
+  
+  return results.map(r => ({ page: r.pagePath, visits: r.visits, userCount: r.userCount }));
+}
+
+function getFilteredPageDailyStats(page, date) {
+  const db = get();
+  const startTimestamp = Math.floor(new Date(date + 'T00:00:00+08:00').getTime() / 1000);
+  const endTimestamp = Math.floor(new Date(date + 'T23:59:59+08:00').getTime() / 1000);
+  
+  const results = db.prepare(`
+    SELECT strftime('%H', datetime(timestamp, 'unixepoch', '+8 hours')) as hour, COUNT(*) as visits
+    FROM statistics
+    WHERE pagePath = ? AND timestamp >= ? AND timestamp <= ?
+    GROUP BY hour
+  `).all(page, startTimestamp, endTimestamp);
+  
+  return results.map(r => ({ hour: parseInt(r.hour), visits: r.visits }));
+}
+
+function getFilteredWeeklyStats(year, week) {
+  const db = get();
+  const startOfYear = new Date(year, 0, 1);
+  const startDate = new Date(startOfYear.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000);
+  const endDate = new Date(startDate.getTime() + 6 * 24 * 60 * 60 * 1000);
+  
+  const startTimestamp = Math.floor(startDate.getTime() / 1000);
+  const endTimestamp = Math.floor(endDate.getTime() / 1000);
+  
+  const results = db.prepare(`
+    SELECT pagePath, COUNT(*) as visits, COUNT(DISTINCT userId) as userCount
+    FROM statistics
+    WHERE timestamp >= ? AND timestamp <= ?
+    GROUP BY pagePath
+  `).all(startTimestamp, endTimestamp);
+  
+  return results.map(r => ({ page: r.pagePath, visits: r.visits, userCount: r.userCount }));
+}
+
+function getFilteredMonthlyStats(year, month) {
+  const db = get();
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0);
+  
+  const startTimestamp = Math.floor(startDate.getTime() / 1000);
+  const endTimestamp = Math.floor(endDate.getTime() / 1000);
+  
+  const results = db.prepare(`
+    SELECT pagePath, COUNT(*) as visits, COUNT(DISTINCT userId) as userCount
+    FROM statistics
+    WHERE timestamp >= ? AND timestamp <= ?
+    GROUP BY pagePath
+  `).all(startTimestamp, endTimestamp);
+  
+  return results.map(r => ({ page: r.pagePath, visits: r.visits, userCount: r.userCount }));
+}
+
 module.exports = {
   recordVisit,
   getTodayStats,
@@ -207,5 +365,16 @@ module.exports = {
   getStatistics,
   migrateFromJson,
   getHongKongTime,
-  getHongKongDateString
+  getHongKongDateString,
+  getDailyStatistics,
+  getTodayPageStats,
+  getPageDailyTrend,
+  getUserTrend,
+  getWeekTrend,
+  getMonthTrend,
+  getPageHourTrend,
+  getFilteredDailyStats,
+  getFilteredPageDailyStats,
+  getFilteredWeeklyStats,
+  getFilteredMonthlyStats
 };

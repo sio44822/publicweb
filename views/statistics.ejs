@@ -181,11 +181,14 @@
 
         async function checkAuth() {
             try {
-                const res = await apiFetch('/api/statistics');
-                if (res.ok) {
+                const res = await apiFetch('/api/stats/check');
+                const data = await res.json();
+                if (data.authenticated) {
                     document.getElementById('loginPanel').classList.add('hidden');
                     document.getElementById('mainPanel').classList.remove('hidden');
                     loadData();
+                } else {
+                    document.getElementById('loginPanel').classList.remove('hidden');
                 }
             } catch (e) {}
         }

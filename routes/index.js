@@ -2,11 +2,7 @@ const express = require('express');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../utils/db');
-const statistics = require('../utils/statistics');
 const statisticsRoutes = require('./statistics');
-
-// Use db.statistics for recordVisit() - SQLite-based
-// Use statistics for startDailyCron() (still in utils/statistics)
 
 const router = express.Router();
 
@@ -16,8 +12,6 @@ const PORT = process.env.PORT || 80;
 const URLBASE = isDev 
   ? `http://localhost:${PORT}` 
   : process.env.PUBLIC_URL || 'https://your-domain.com';
-
-statistics.startDailyCron();
 
 function getUserId(req, res) {
   let userId = req.cookies.coupon_user_id;
@@ -40,36 +34,44 @@ router.get('/config', (req, res) => {
   });
 });
 
-router.get('/public/coursereservation', (req, res) => {
-  const userId = getUserId(req, res);
-  db.statistics.recordVisit(userId, '/public/coursereservation');
-  res.render('coursereservation');
-});
-
-router.get('/public/url-qr-doc-tool', (req, res) => {
-  const userId = getUserId(req, res);
-  db.statistics.recordVisit(userId, '/public/url-qr-doc-tool');
-  res.render('url-qr-doc-tool');
-});
-
-router.get('/public/1', (req, res) => {
-  res.redirect('/public/coursereservation');
-});
-
-router.get('/public/11.html', (req, res) => {
-  res.redirect('/public/coursereservation');
-});
-
 router.get('/', (req, res) => {
-  res.send(`URLBASE: ${URLBASE}<br>Mode: ${isDev ? 'Development' : 'Production'}`);
+  res.render('services');
 });
 
 router.get('/services', (req, res) => {
   res.render('services');
 });
 
-router.get('/statistics', (req, res) => {
-  res.render('statistics');
+
+
+router.get('/public/coursereservation', (req, res) => {
+  const userId = getUserId(req, res);
+  try {
+    db.statistics.recordVisit(userId, '/public/coursereservation');
+  } catch (e) {
+    console.error('[recordVisit] coursereservation error:', e.message);
+  }
+  res.render('coursereservation');
+});
+
+router.get('/public/coupon', (req, res) => {
+  const userId = getUserId(req, res);
+  try {
+    db.statistics.recordVisit(userId, '/public/coupon');
+  } catch (e) {
+    console.error('[recordVisit] coupon error:', e.message);
+  }
+  res.render('coupon');
+});
+
+router.get('/public/url-qr-doc-tool', (req, res) => {
+  const userId = getUserId(req, res);
+  try {
+    db.statistics.recordVisit(userId, '/public/url-qr-doc-tool');
+  } catch (e) {
+    console.error('[recordVisit] url-qr-doc-tool error:', e.message);
+  }
+  res.render('url-qr-doc-tool');
 });
 
 router.get('/mgmt/courses', (req, res) => {
@@ -77,6 +79,13 @@ router.get('/mgmt/courses', (req, res) => {
   const isAdmin = cookie === ADMIN_SECRET;
   const courses = db.courses.getAll();
   res.render('admin/courses', { courses, isAdmin });
+});
+
+router.get('/mgmt/services', (req, res) => {
+  const cookie = req.cookies[ADMIN_COOKIE];
+  const isAdmin = cookie === ADMIN_SECRET;
+  const allServices = db.services.getAll();
+  res.render('admin/services', { services: allServices, isAdmin });
 });
 
 router.get('/api/courses', (req, res) => {
@@ -113,6 +122,25 @@ router.get('/api/courses/:id', (req, res) => {
   res.json(course);
 });
 
+router.put('/api/courses/:id', (req, res) => {
+  const { id } = req.params;
+  const { name, description, image, slots } = req.body;
+  const course = db.courses.updateCourse(id, { name, description, image, slots });
+  if (!course) {
+    return res.status(404).json({ error: '課程不存在' });
+  }
+  res.json(course);
+});
+
+router.delete('/api/courses/:id', (req, res) => {
+  const { id } = req.params;
+  const success = db.courses.deleteCourse(id);
+  if (!success) {
+    return res.status(404).json({ error: '課程不存在' });
+  }
+  res.json({ success: true });
+});
+
 router.put('/api/courses/batch-update', (req, res) => {
   const { courses } = req.body;
   if (!courses || !Array.isArray(courses)) {
@@ -134,25 +162,6 @@ router.post('/api/courses/sync', async (req, res) => {
     console.error('[Sync] Error:', err);
     res.status(500).json({ error: '同步失敗' });
   }
-});
-
-router.put('/api/courses/:id', (req, res) => {
-  const { id } = req.params;
-  const { name, description, image, slots } = req.body;
-  const course = db.courses.updateCourse(id, { name, description, image, slots });
-  if (!course) {
-    return res.status(404).json({ error: '課程不存在' });
-  }
-  res.json(course);
-});
-
-router.delete('/api/courses/:id', (req, res) => {
-  const { id } = req.params;
-  const success = db.courses.deleteCourse(id);
-  if (!success) {
-    return res.status(404).json({ error: '課程不存在' });
-  }
-  res.json({ success: true });
 });
 
 router.post('/api/courses/book', async (req, res) => {
@@ -217,13 +226,6 @@ router.post('/api/courses/book', async (req, res) => {
 router.get('/api/services', (req, res) => {
   const services = db.services.getEnabled();
   res.json(services);
-});
-
-router.get('/mgmt/services', (req, res) => {
-  const cookie = req.cookies[ADMIN_COOKIE];
-  const isAdmin = cookie === ADMIN_SECRET;
-  const allServices = db.services.getAll();
-  res.render('admin/services', { services: allServices, isAdmin });
 });
 
 router.post('/api/services/update', (req, res) => {
@@ -310,6 +312,14 @@ router.post('/api/services/login', (req, res) => {
 router.post('/api/services/logout', (req, res) => {
   res.clearCookie(ADMIN_COOKIE);
   res.json({ ok: true });
+});
+
+router.get('/public/1', (req, res) => {
+  res.redirect('/public/coursereservation');
+});
+
+router.get('/public/11.html', (req, res) => {
+  res.redirect('/public/coursereservation');
 });
 
 setTimeout(() => {

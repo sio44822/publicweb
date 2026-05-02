@@ -4,6 +4,9 @@ const path = require('path');
 const ejs = require('ejs');
 const cookieParser = require('cookie-parser');
 const routes = require('./routes');
+const { initialize } = require('./utils/db/schema');
+
+initialize();
 
 const app = express();
 const PORT = process.env.PORT ||80;

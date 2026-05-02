@@ -1,5 +1,5 @@
 const express = require('express');
-const statistics = require('../utils/statistics');
+const statistics = require('../utils/db/statistics');
 
 const router = express.Router();
 
@@ -47,6 +47,20 @@ router.post('/api/stats/login', (req, res) => {
 router.post('/api/stats/logout', (req, res) => {
   res.cookie('stats_token', '', { maxAge: 0 });
   res.json({ success: true });
+});
+
+router.get('/api/stats/check', (req, res) => {
+  const statsToken = req.cookies.stats_token;
+  if (statsToken) {
+    try {
+      const decoded = Buffer.from(statsToken, 'base64').toString('utf8');
+      const [user, pass, expiry] = decoded.split('|');
+      if (user === STATS_USERNAME && pass === STATS_PASSWORD && parseInt(expiry) > Date.now()) {
+        return res.json({ authenticated: true });
+      }
+    } catch (e) {}
+  }
+  res.json({ authenticated: false });
 });
 
 router.get('/statistics', (req, res) => {
