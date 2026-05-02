@@ -40,9 +40,9 @@ router.get('/config', (req, res) => {
   });
 });
 
-router.get('/public/1', (req, res) => {
+router.get('/public/coursereservation', (req, res) => {
   const userId = getUserId(req, res);
-  db.statistics.recordVisit(userId, '/public/1');
+  db.statistics.recordVisit(userId, '/public/coursereservation');
   res.render('coursereservation');
 });
 
@@ -52,8 +52,12 @@ router.get('/public/url-qr-doc-tool', (req, res) => {
   res.render('url-qr-doc-tool');
 });
 
+router.get('/public/1', (req, res) => {
+  res.redirect('/public/coursereservation');
+});
+
 router.get('/public/11.html', (req, res) => {
-  res.render('coursereservation');
+  res.redirect('/public/coursereservation');
 });
 
 router.get('/', (req, res) => {
@@ -159,17 +163,14 @@ router.post('/api/courses/book', async (req, res) => {
   }
 
   const courseIdNum = parseInt(courseId, 10);
-  console.log('[Book] courseId:', courseId, '-> parsed:', courseIdNum);
   
   const course = db.courses.getById(courseIdNum);
-  console.log('[Book] course found:', course ? course.name : 'NOT FOUND');
   
   if (!course) {
     return res.status(404).json({ error: '課程不存在' });
   }
 
   const slot = (course.slots || []).find(s => s.time === time);
-  console.log('[Book] slot found:', slot);
   
   if (!slot) {
     return res.status(404).json({ error: '時段不存在' });
@@ -177,7 +178,6 @@ router.post('/api/courses/book', async (req, res) => {
 
   const limit = slot.limit || 3;
   const booked = slot.booked || 0;
-  console.log('[Book] limit:', limit, 'booked:', booked);
 
   if (booked >= limit) {
     return res.status(400).json({ error: '該時段名額已滿' });
@@ -204,10 +204,8 @@ router.post('/api/courses/book', async (req, res) => {
       }
       return s;
     });
-    console.log('[Book] newSlots:', JSON.stringify(newSlots));
     
     const updated = db.courses.updateCourse(courseIdNum, { slots: newSlots });
-    console.log('[Book] update result:', updated ? 'SUCCESS' : 'FAILED');
     
     res.json({ success: true });
   } catch (err) {
@@ -250,10 +248,8 @@ const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyYMAW1pdigBw
 async function fetchGoogleSheetStats() {
   try {
     const url = `${GOOGLE_SCRIPT_URL}?action=getStats&t=${Date.now()}`;
-    console.log('[fetchGoogleSheetStats] URL:', url);
     const res = await fetch(url);
     const json = await res.json();
-    console.log('[fetchGoogleSheetStats] Raw response:', JSON.stringify(json));
     return json;
   } catch (e) {
     console.error('Failed to fetch Google Sheet stats:', e);
@@ -262,21 +258,16 @@ async function fetchGoogleSheetStats() {
 }
 
 async function refreshCourseBookingsFromGoogle() {
-  console.log('[refreshCourseBookingsFromGoogle] Fetching from Google Sheet...');
   const stats = await fetchGoogleSheetStats();
-  console.log('[refreshCourseBookingsFromGoogle] Stats received:', JSON.stringify(stats));
   if (!stats) return false;
 
   const courses = db.courses.getAll();
-  console.log('[refreshCourseBookingsFromGoogle] Local courses:', courses.length);
-  console.log('[refreshCourseBookingsFromGoogle] Google Sheet keys:', Object.keys(stats));
   let updated = 0;
 
   for (const course of courses) {
     let needsUpdate = false;
     const newSlots = (course.slots || []).map(slot => {
       const key = `${course.name}-${slot.time}`;
-      console.log(`[refreshCourseBookingsFromGoogle] Checking key: "${key}", value: ${stats[key]}`);
       // 没数据时重置为 0
       const googleBooked = (stats[key] !== undefined && stats[key] !== null) 
         ? parseInt(stats[key], 10) 
@@ -284,20 +275,17 @@ async function refreshCourseBookingsFromGoogle() {
       
       if (slot.booked !== googleBooked && !isNaN(googleBooked)) {
         needsUpdate = true;
-        console.log(`[refreshCourseBookingsFromGoogle] Will update: ${key} from ${slot.booked} to ${googleBooked}`);
         return { ...slot, booked: googleBooked };
       }
       return slot;
     });
 
     if (needsUpdate) {
-      console.log(`[refreshCourseBookingsFromGoogle] Updating course: ${course.name}`);
       db.courses.updateCourse(course.id, { slots: newSlots });
       updated++;
     }
   }
 
-  console.log('[refreshCourseBookingsFromGoogle] Total updated:', updated);
   return updated;
 }
 
@@ -325,9 +313,7 @@ router.post('/api/services/logout', (req, res) => {
 });
 
 setTimeout(() => {
-  console.log('[Startup] Syncing course bookings from Google Sheet...');
   refreshCourseBookingsFromGoogle().then(updated => {
-    console.log(`[Startup] Sync completed, updated: ${updated}`);
   }).catch(err => {
     console.error('[Startup] Sync failed:', err);
   });

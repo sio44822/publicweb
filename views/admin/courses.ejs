@@ -269,7 +269,6 @@
                     { time: '15:00', limit: 3, booked: 0 }
                 ]
             };
-            console.log('payload:', JSON.stringify(payload));
             
             try {
                 const res = await fetch('/api/courses', {
@@ -424,7 +423,6 @@
                 if (!res.ok) throw new Error('Sync failed');
                 
                 const result = await res.json();
-                console.log('Sync result:', result);
 
                 const coursesRes = await fetch('/api/courses');
                 const courses = await coursesRes.json();

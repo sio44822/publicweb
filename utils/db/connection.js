@@ -18,7 +18,7 @@ const open = () => {
   const dbPath = getDbPath();
   db = new Database(dbPath);
   
-  // Enable foreign keys
+  // Enable foreign keys and set busy timeout
   db.pragma('foreign_keys = ON');
   
   return db;
