@@ -13,13 +13,6 @@ const URLBASE = isDev
   ? `http://localhost:${PORT}` 
   : process.env.PUBLIC_URL || 'https://your-domain.com';
 
-function getNavServices(currentPath) {
-  const currentService = db.services.getEnabled().find(s => s.url === currentPath);
-  if (!currentService || currentService.showInNav === false) return [];
-  const services = db.services.getEnabled();
-  return services.map(s => ({ id: s.id, name: s.name, url: s.url, icon: s.icon }));
-}
-
 function getUserId(req, res) {
   let userId = req.cookies.coupon_user_id;
   if (!userId) {
@@ -58,8 +51,7 @@ router.get('/public/coursereservation', (req, res) => {
   } catch (e) {
     console.error('[recordVisit] coursereservation error:', e.message);
   }
-  const navServices = getNavServices('/public/coursereservation');
-  res.render('coursereservation', { navServices, currentPath: '/public/coursereservation' });
+  res.render('coursereservation');
 });
 
 router.get('/public/coupon', (req, res) => {
@@ -69,8 +61,7 @@ router.get('/public/coupon', (req, res) => {
   } catch (e) {
     console.error('[recordVisit] coupon error:', e.message);
   }
-  const navServices = getNavServices('/public/coupon');
-  res.render('coupon', { navServices, currentPath: '/public/coupon' });
+  res.render('coupon');
 });
 
 router.get('/public/url-qr-doc-tool', (req, res) => {
@@ -80,8 +71,7 @@ router.get('/public/url-qr-doc-tool', (req, res) => {
   } catch (e) {
     console.error('[recordVisit] url-qr-doc-tool error:', e.message);
   }
-  const navServices = getNavServices('/public/url-qr-doc-tool');
-  res.render('url-qr-doc-tool', { navServices, currentPath: '/public/url-qr-doc-tool' });
+  res.render('url-qr-doc-tool');
 });
 
 router.get('/mgmt/courses', (req, res) => {

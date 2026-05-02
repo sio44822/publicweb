@@ -10,8 +10,7 @@ function getAll() {
     url: row.url || '',
     icon: row.icon || '',
     order: row.order_number,
-    enabled: row.enabled === 1,
-    showInNav: row.show_in_nav !== 0
+    enabled: row.enabled === 1
   }));
 }
 
@@ -24,8 +23,7 @@ function getEnabled() {
     url: row.url || '',
     icon: row.icon || '',
     order: row.order_number,
-    enabled: true,
-    showInNav: row.show_in_nav !== 0
+    enabled: true
   }));
 }
 
@@ -39,8 +37,7 @@ function getById(id) {
     url: row.url || '',
     icon: row.icon || '',
     order: row.order_number,
-    enabled: row.enabled === 1,
-    showInNav: row.show_in_nav !== 0
+    enabled: row.enabled === 1
   };
 }
 
@@ -54,7 +51,6 @@ function update(id, updates) {
   if (updates.icon !== undefined) { fields.push('icon = ?'); values.push(updates.icon); }
   if (updates.order !== undefined) { fields.push('order_number = ?'); values.push(updates.order); }
   if (updates.enabled !== undefined) { fields.push('enabled = ?'); values.push(updates.enabled ? 1 : 0); }
-  if (updates.showInNav !== undefined) { fields.push('show_in_nav = ?'); values.push(updates.showInNav ? 1 : 0); }
   
   if (fields.length === 0) return false;
   
@@ -71,10 +67,9 @@ function saveServices(config) {
   const db = get();
   const transaction = db.transaction(() => {
     db.prepare('DELETE FROM services').run();
-    const insert = db.prepare('INSERT INTO services (id, name, description, url, icon, order_number, enabled, show_in_nav) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+    const insert = db.prepare('INSERT INTO services (id, name, description, url, icon, order_number, enabled) VALUES (?, ?, ?, ?, ?, ?, ?)');
     for (const svc of config.services) {
-      const showInNav = svc.showInNav !== false ? 1 : 0;
-      insert.run(String(svc.id), svc.name || '', svc.description || '', svc.url || '', svc.icon || '', svc.order || 0, svc.enabled ? 1 : 0, showInNav);
+      insert.run(String(svc.id), svc.name || '', svc.description || '', svc.url || '', svc.icon || '', svc.order || 0, svc.enabled ? 1 : 0);
     }
   });
   transaction();
