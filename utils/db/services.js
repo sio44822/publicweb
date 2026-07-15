@@ -15,20 +15,14 @@ const svcMap = (id, data) => ({
 });
 
 async function getAll() {
-  const snapshot = await getDb().collection(COLLECTION).orderBy('order', 'asc').get();
-  return snapshot.docs.map(d => svcMap(d.id, d.data()));
+  const snapshot = await getDb().collection(COLLECTION).get();
+  const all = snapshot.docs.map(d => svcMap(d.id, d.data()));
+  return all.sort((a, b) => a.order - b.order);
 }
 
 async function getEnabled() {
-  const snapshot = await getDb().collection(COLLECTION)
-    .where('enabled', '==', true)
-    .orderBy('order', 'asc')
-    .get();
-  return snapshot.docs.map(d => {
-    const s = svcMap(d.id, d.data());
-    s.enabled = true;
-    return s;
-  });
+  const all = await getAll();
+  return all.filter(s => s.enabled);
 }
 
 async function getById(id) {
