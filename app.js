@@ -2,7 +2,11 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const ejs = require('ejs');
+const cookieParser = require('cookie-parser');
 const routes = require('./routes');
+const { initialize } = require('./utils/db/schema');
+
+initialize();
 
 const app = express();
 const PORT = process.env.PORT ||80;
@@ -10,10 +14,18 @@ const PORT = process.env.PORT ||80;
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
+app.use(cookieParser());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(routes);
 
+// Export for Vercel serverless runtime
+module.exports = app;
+
+// Only start the server when running locally (not on Vercel)
+if (!process.env.VERCEL) {
 app.listen(PORT, () => {
   const isDev = process.env.NODE_ENV === 'development';
   const URLBASE = isDev 
@@ -23,3 +35,4 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT} ${URLBASE}`);
   console.log(`Mode: ${isDev ? 'Development (nodemon)' : 'Production'}`);
 });
+}
