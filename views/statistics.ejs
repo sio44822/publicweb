@@ -360,8 +360,16 @@ function renderServiceChart(data) {
   }
   const total = data.reduce((s,d)=>s+(d.visits||0),0);
   let html = '<div class="space-y-0.5">';
+  var uh = '<div class="flex items-center justify-between py-1 px-3 text-xs text-slate-400 font-medium">';
+  uh += '<span>頁面</span>';
+  uh += '<div class="flex items-center gap-3 shrink-0">';
+  uh += '<span class="w-16 text-right">人次</span>';
+  uh += '<span class="w-16 text-right">不重複</span>';
+  uh += '</div></div>';
+  html += uh;
   data.slice(0,15).forEach((s,i) => {
     const pct = total > 0 ? ((s.visits||0)/total*100).toFixed(1) : 0;
+    var uu = s.uniqueUsers || s.users || 0;
     html += '<div class="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-slate-50 transition">';
     html += '<div class="flex items-center gap-2 min-w-0">';
     html += '<span class="w-2 h-2 rounded-full shrink-0" style="background:'+getColor(i)+'"></span>';
@@ -369,7 +377,8 @@ function renderServiceChart(data) {
     html += '</div>';
     html += '<div class="flex items-center gap-3 shrink-0">';
     html += '<span class="text-xs text-slate-400 w-10 text-right">'+pct+'%</span>';
-    html += '<span class="text-sm font-bold text-blue-600 w-16 text-right">'+(s.visits||0)+' 次</span>';
+    html += '<span class="text-sm font-bold text-blue-600 w-16 text-right">'+(s.visits||0)+'</span>';
+    html += '<span class="text-sm font-bold text-emerald-600 w-16 text-right">'+uu+'</span>';
     html += '</div></div>';
   });
   html += '</div>';
