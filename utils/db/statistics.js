@@ -1,16 +1,8 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { get } from './connection.js';
+﻿import { getDb, Timestamp, FieldValue } from './firebase.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const STATS_COL = 'statistics';
+const DAILY_COL = 'daily_stats';
 
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
-const STATISTICS_FILE = path.join(DATA_DIR, 'coupon-statistics.json');
-const DAILY_STATS_FILE = path.join(DATA_DIR, 'daily-statistics.json');
-
-// Helper: Get Hong Kong time as ISO string
 function getHongKongTime() {
   const date = new Date(Date.now() + 8 * 60 * 60 * 1000);
   const year = date.getUTCFullYear();
@@ -23,7 +15,6 @@ function getHongKongTime() {
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}.${ms}+08:00`;
 }
 
-// Helper: Get Hong Kong date string (YYYY-MM-DD)
 function getHongKongDateString() {
   const date = new Date(Date.now() + 8 * 60 * 60 * 1000);
   const year = date.getUTCFullYear();
@@ -32,333 +23,395 @@ function getHongKongDateString() {
   return `${year}-${month}-${day}`;
 }
 
-// Helper: Convert ISO 8601 time to Unix timestamp (seconds)
 function timeToTimestamp(timeStr) {
   return Math.floor(new Date(timeStr).getTime() / 1000);
 }
 
-// Record a visit to the statistics table
-function recordVisit(userId, pagePath = '/') {
-  const db = get();
-  const timestamp = timeToTimestamp(getHongKongTime());
-  
-  const stmt = db.prepare(`
-    INSERT INTO statistics (userId, pagePath, timestamp)
-    VALUES (?, ?, ?)
-  `);
-  
-  const result = stmt.run(userId, pagePath, timestamp);
-  return result.changes;
+function hkDayRange(dateStr) {
+  const start = Math.floor(new Date(dateStr + 'T00:00:00+08:00').getTime() / 1000);
+  const end = Math.floor(new Date(dateStr + 'T23:59:59+08:00').getTime() / 1000);
+  return { start, end };
 }
 
-// Get today's statistics
-function getTodayStats() {
-  const db = get();
+async function recordVisit(userId, pagePath = '/') {
+  const timestamp = timeToTimestamp(getHongKongTime());
   const hkDate = getHongKongDateString();
-  const todayStart = new Date(hkDate + 'T00:00:00+08:00');
-  const todayEnd = new Date(hkDate + 'T23:59:59+08:00');
-  
-  const startTimestamp = Math.floor(todayStart.getTime() / 1000);
-  const endTimestamp = Math.floor(todayEnd.getTime() / 1000);
-  
-  const userCount = db.prepare(`
-    SELECT COUNT(DISTINCT userId) as count
-    FROM statistics
-    WHERE timestamp >= ? AND timestamp <= ?
-  `).get(startTimestamp, endTimestamp).count;
-  
-  const visitCount = db.prepare(`
-    SELECT COUNT(*) as count
-    FROM statistics
-    WHERE timestamp >= ? AND timestamp <= ?
-  `).get(startTimestamp, endTimestamp).count;
-  
+
+  await getDb().collection(STATS_COL).add({ userId, pagePath, timestamp, createdAt: Timestamp.now() });
+
+  const dailyRef = getDb().collection(DAILY_COL).doc(hkDate);
+  await dailyRef.set({
+    date: hkDate,
+    totalVisitors: FieldValue.increment(1),
+    totalPageViews: FieldValue.increment(1),
+    updatedAt: Timestamp.now(),
+    createdAt: FieldValue.serverTimestamp()
+  }, { merge: true });
+
+  return 1;
+}
+
+async function getTodayStats() {
+  const hkDate = getHongKongDateString();
+  const { start, end } = hkDayRange(hkDate);
+
+  const snapshot = await getDb().collection(STATS_COL)
+    .where('timestamp', '>=', start)
+    .where('timestamp', '<=', end)
+    .get();
+
+  const users = new Set();
+  snapshot.forEach(d => users.add(d.data().userId));
+
   return {
     date: hkDate,
-    userCount,
-    visitCount
+    userCount: users.size,
+    visitCount: snapshot.size
   };
 }
 
-// Get page statistics (optionally filtered by page)
-function getPageStats(page) {
-  const db = get();
-  let query = `
-    SELECT pagePath as page, COUNT(*) as visits, COUNT(DISTINCT userId) as userCount
-    FROM statistics
-  `;
-  
+async function getPageStats(page) {
+  const snapshot = await getDb().collection(STATS_COL).get();
+  const agg = {};
+  snapshot.forEach(d => {
+    const p = d.data().pagePath || '/';
+    if (!agg[p]) agg[p] = { visits: 0, userCount: new Set() };
+    agg[p].visits++;
+    agg[p].userCount.add(d.data().userId);
+  });
+
   if (page) {
-    query += ` WHERE pagePath = ?`;
-    query += ` GROUP BY pagePath`;
-    const result = db.prepare(query).get(page);
-    return result ? { [result.page]: { visits: result.visits, userCount: result.userCount } } : {};
-  } else {
-    query += ` GROUP BY pagePath`;
-    const results = db.prepare(query).all();
-    const result = {};
-    results.forEach(row => {
-      result[row.page] = { visits: row.visits, userCount: row.userCount };
-    });
-    return result;
+    const g = agg[page];
+    if (!g) return {};
+    return { [page]: { visits: g.visits, userCount: g.userCount.size } };
   }
+  const result = {};
+  for (const [p, g] of Object.entries(agg)) {
+    result[p] = { visits: g.visits, userCount: g.userCount.size };
+  }
+  return result;
 }
 
-// Get daily statistics (optionally filtered by date)
-function getDailyStats(date) {
-  const db = get();
-  const hkDate = date || getHongKongDateString();
-  
+async function getDailyStats(date) {
   if (date) {
-    const row = db.prepare('SELECT * FROM daily_stats WHERE date = ?').get(date);
-    return row ? { [row.date]: { userCount: row.totalVisitors, visitCount: row.totalPageViews } } : {};
-  } else {
-    const results = db.prepare('SELECT * FROM daily_stats').all();
-    const result = {};
-    results.forEach(row => {
-      result[row.date] = { userCount: row.totalVisitors, visitCount: row.totalPageViews };
-    });
-    return result;
+    const doc = await getDb().collection(DAILY_COL).doc(date).get();
+    if (!doc.exists) return {};
+    const d = doc.data();
+    return { [date]: { userCount: d.totalVisitors, visitCount: d.totalPageViews } };
   }
+  const snapshot = await getDb().collection(DAILY_COL).orderBy('date', 'asc').get();
+  const result = {};
+  snapshot.forEach(d => {
+    const data = d.data();
+    result[data.date] = { userCount: data.totalVisitors, visitCount: data.totalPageViews };
+  });
+  return result;
 }
 
-// Get all statistics records (for compatibility)
-function getStatistics() {
-  const db = get();
-  const results = db.prepare(`
-    SELECT userId, pagePath, timestamp
-    FROM statistics
-    ORDER BY timestamp DESC
-  `).all();
-  
-  // Convert timestamps back to ISO format
-  return results.map(row => ({
-    userId: row.userId,
-    pagePath: row.pagePath,
-    time: new Date(row.timestamp * 1000).toISOString()
-  }));
+async function getStatistics() {
+  const snapshot = await getDb().collection(STATS_COL)
+    .orderBy('timestamp', 'desc')
+    .get();
+  return snapshot.docs.map(d => {
+    const data = d.data();
+    return {
+      userId: data.userId,
+      pagePath: data.pagePath,
+      time: new Date(data.timestamp * 1000).toISOString()
+    };
+  });
 }
 
-// Migrate data from JSON files to SQLite
-function migrateFromJson() {
-  const db = get();
-  
-  console.log('[Statistics Migration] Starting migration from JSON to SQLite...');
-  
-  // Check if data already exists
-  const existingCount = db.prepare('SELECT COUNT(*) as count FROM statistics').get().count;
-  if (existingCount > 0) {
-    console.log(`[Statistics Migration] Statistics table already has ${existingCount} records. Skipping migration.`);
-  } else {
-    // Read coupon-statistics.json
-    if (fs.existsSync(STATISTICS_FILE)) {
-      const statsData = JSON.parse(fs.readFileSync(STATISTICS_FILE, 'utf8'));
-      console.log(`[Statistics Migration] Found ${statsData.length} records in coupon-statistics.json`);
-      
-      const insertStmt = db.prepare(`
-        INSERT INTO statistics (userId, pagePath, timestamp)
-        VALUES (?, ?, ?)
-      `);
-      
-      const insertMany = db.transaction((records) => {
-        for (const record of records) {
-          const timestamp = timeToTimestamp(record.time);
-          const pagePath = record.pagePath || '/';  // Default to root path if missing
-          insertStmt.run(record.userId, pagePath, timestamp);
-        }
-      });
-      
-      insertMany(statsData);
-      console.log(`[Statistics Migration] Migrated ${statsData.length} statistics records`);
-    } else {
-      console.log('[Statistics Migration] coupon-statistics.json not found, skipping');
-    }
-  }
-  
-  // Check if daily_stats already has data
-  const existingDailyCount = db.prepare('SELECT COUNT(*) as count FROM daily_stats').get().count;
-  if (existingDailyCount > 0) {
-    console.log(`[Statistics Migration] daily_stats table already has ${existingDailyCount} records. Skipping migration.`);
-  } else {
-    // Read daily-statistics.json
-    if (fs.existsSync(DAILY_STATS_FILE)) {
-      const dailyData = JSON.parse(fs.readFileSync(DAILY_STATS_FILE, 'utf8'));
-      console.log(`[Statistics Migration] Found ${Object.keys(dailyData).length} records in daily-statistics.json`);
-      
-      const insertStmt = db.prepare(`
-        INSERT INTO daily_stats (date, totalVisitors, totalPageViews)
-        VALUES (?, ?, ?)
-      `);
-      
-      Object.entries(dailyData).forEach(([date, values]) => {
-        insertStmt.run(date, values.userCount, values.visitCount);
-      });
-      
-      console.log(`[Statistics Migration] Migrated ${Object.keys(dailyData).length} daily_stats records`);
-    } else {
-      console.log('[Statistics Migration] daily-statistics.json not found, skipping');
-    }
-  }
-  
-  console.log('[Statistics Migration] Migration complete');
-}
-
-function getDailyStatistics() {
+async function getDailyStatistics() {
   return getDailyStats();
 }
 
-function getTodayPageStats(page) {
-  const db = get();
+async function getTodayPageStats(page) {
   const hkDate = getHongKongDateString();
-  const todayStart = new Date(hkDate + 'T00:00:00+08:00');
-  const todayEnd = new Date(hkDate + 'T23:59:59+08:00');
-  const startTimestamp = Math.floor(todayStart.getTime() / 1000);
-  const endTimestamp = Math.floor(todayEnd.getTime() / 1000);
-  
-  const result = db.prepare(`
-    SELECT COUNT(*) as visits, COUNT(DISTINCT userId) as userCount
-    FROM statistics
-    WHERE pagePath = ? AND timestamp >= ? AND timestamp <= ?
-  `).get(page, startTimestamp, endTimestamp);
-  
-  return { date: hkDate, page, visits: result.visits, userCount: result.userCount };
+  const { start, end } = hkDayRange(hkDate);
+  const snapshot = await getDb().collection(STATS_COL)
+    .where('pagePath', '==', page)
+    .where('timestamp', '>=', start)
+    .where('timestamp', '<=', end)
+    .get();
+  const users = new Set();
+  snapshot.forEach(d => users.add(d.data().userId));
+  return { date: hkDate, page, visits: snapshot.size, userCount: users.size };
 }
 
-function getPageDailyTrend(page, days = 7) {
-  const db = get();
+async function getPageDailyTrend(page, days = 7) {
   const results = [];
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date(Date.now() + 8 * 60 * 60 * 1000 - i * 24 * 60 * 60 * 1000);
-    const hkDate = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
-    const startTimestamp = Math.floor(new Date(hkDate + 'T00:00:00+08:00').getTime() / 1000);
-    const endTimestamp = Math.floor(new Date(hkDate + 'T23:59:59+08:00').getTime() / 1000);
-    
-    const result = db.prepare(`
-      SELECT COUNT(*) as visits, COUNT(DISTINCT userId) as userCount
-      FROM statistics
-      WHERE pagePath = ? AND timestamp >= ? AND timestamp <= ?
-    `).get(page, startTimestamp, endTimestamp);
-    
-    results.push({ date: hkDate, visits: result.visits, userCount: result.userCount });
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const hkDate = `${year}-${month}-${day}`;
+    const { start, end } = hkDayRange(hkDate);
+    const snapshot = await getDb().collection(STATS_COL)
+      .where('pagePath', '==', page)
+      .where('timestamp', '>=', start)
+      .where('timestamp', '<=', end)
+      .get();
+    const users = new Set();
+    snapshot.forEach(d => users.add(d.data().userId));
+    results.push({ date: hkDate, visits: snapshot.size, userCount: users.size });
   }
   return results;
 }
 
-function getUserTrend(days = 7) {
-  const db = get();
+async function getUserTrend(days = 7) {
   const results = [];
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date(Date.now() + 8 * 60 * 60 * 1000 - i * 24 * 60 * 60 * 1000);
-    const hkDate = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
-    const startTimestamp = Math.floor(new Date(hkDate + 'T00:00:00+08:00').getTime() / 1000);
-    const endTimestamp = Math.floor(new Date(hkDate + 'T23:59:59+08:00').getTime() / 1000);
-    
-    const result = db.prepare(`
-      SELECT COUNT(*) as visits, COUNT(DISTINCT userId) as userCount
-      FROM statistics
-      WHERE timestamp >= ? AND timestamp <= ?
-    `).get(startTimestamp, endTimestamp);
-    
-    results.push({ date: hkDate, visits: result.visits, userCount: result.userCount });
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const hkDate = `${year}-${month}-${day}`;
+    const { start, end } = hkDayRange(hkDate);
+    const snapshot = await getDb().collection(STATS_COL)
+      .where('timestamp', '>=', start)
+      .where('timestamp', '<=', end)
+      .get();
+    const users = new Set();
+    snapshot.forEach(d => users.add(d.data().userId));
+    results.push({ date: hkDate, visits: snapshot.size, userCount: users.size });
   }
   return results;
 }
 
-function getWeekTrend() {
-  return getUserTrend(7);
-}
+async function getWeekTrend() { return getUserTrend(7); }
 
-function getMonthTrend() {
-  return getUserTrend(30);
-}
+async function getMonthTrend() { return getUserTrend(30); }
 
-function getPageHourTrend(page, hours = 24) {
-  const db = get();
+async function getPageHourTrend(page, hours = 24) {
   const now = Date.now() + 8 * 60 * 60 * 1000;
   const results = [];
-  
   for (let i = hours - 1; i >= 0; i--) {
-    const hourStart = new Date(now - i * 60 * 60 * 1000);
-    const hourEnd = new Date(now - (i - 1) * 60 * 60 * 1000);
-    const startTimestamp = Math.floor(hourStart.getTime() / 1000);
-    const endTimestamp = Math.floor(hourEnd.getTime() / 1000);
-    
-    const result = db.prepare(`
-      SELECT COUNT(*) as visits
-      FROM statistics
-      WHERE pagePath = ? AND timestamp >= ? AND timestamp < ?
-    `).get(page, startTimestamp, endTimestamp);
-    
-    results.push({ hour: hourStart.getUTCHours(), visits: result.visits });
+    const hourStart = Math.floor((now - i * 60 * 60 * 1000) / 1000);
+    const hourEnd = Math.floor((now - (i - 1) * 60 * 60 * 1000) / 1000);
+    const snapshot = await getDb().collection(STATS_COL)
+      .where('pagePath', '==', page)
+      .where('timestamp', '>=', hourStart)
+      .where('timestamp', '<', hourEnd)
+      .get();
+    const h = new Date(now - i * 60 * 60 * 1000).getUTCHours();
+    results.push({ hour: h, visits: snapshot.size });
   }
   return results;
 }
 
-function getFilteredDailyStats(date) {
-  const db = get();
-  const startTimestamp = Math.floor(new Date(date + 'T00:00:00+08:00').getTime() / 1000);
-  const endTimestamp = Math.floor(new Date(date + 'T23:59:59+08:00').getTime() / 1000);
-  
-  const results = db.prepare(`
-    SELECT pagePath, COUNT(*) as visits, COUNT(DISTINCT userId) as userCount
-    FROM statistics
-    WHERE timestamp >= ? AND timestamp <= ?
-    GROUP BY pagePath
-  `).all(startTimestamp, endTimestamp);
-  
-  return results.map(r => ({ page: r.pagePath, visits: r.visits, userCount: r.userCount }));
+async function getFilteredDailyStats(date) {
+  const { start, end } = hkDayRange(date);
+  const snapshot = await getDb().collection(STATS_COL)
+    .where('timestamp', '>=', start)
+    .where('timestamp', '<=', end)
+    .get();
+  const agg = {};
+  snapshot.forEach(d => {
+    const p = d.data().pagePath || '/';
+    if (!agg[p]) agg[p] = { visits: 0, users: new Set() };
+    agg[p].visits++;
+    agg[p].users.add(d.data().userId);
+  });
+  return Object.entries(agg).map(([page, v]) => ({ page, visits: v.visits, userCount: v.users.size }));
 }
 
-function getFilteredPageDailyStats(page, date) {
-  const db = get();
-  const startTimestamp = Math.floor(new Date(date + 'T00:00:00+08:00').getTime() / 1000);
-  const endTimestamp = Math.floor(new Date(date + 'T23:59:59+08:00').getTime() / 1000);
-  
-  const results = db.prepare(`
-    SELECT strftime('%H', datetime(timestamp, 'unixepoch', '+8 hours')) as hour, COUNT(*) as visits
-    FROM statistics
-    WHERE pagePath = ? AND timestamp >= ? AND timestamp <= ?
-    GROUP BY hour
-  `).all(page, startTimestamp, endTimestamp);
-  
-  return results.map(r => ({ hour: parseInt(r.hour), visits: r.visits }));
+async function getFilteredPageDailyStats(page, date) {
+  const { start, end } = hkDayRange(date);
+  const snapshot = await getDb().collection(STATS_COL)
+    .where('pagePath', '==', page)
+    .where('timestamp', '>=', start)
+    .where('timestamp', '<=', end)
+    .get();
+  const hourly = {};
+  snapshot.forEach(d => {
+    const t = d.data().timestamp;
+    const hour = new Date(t * 1000 + 8 * 3600 * 1000).getUTCHours();
+    if (!hourly[hour]) hourly[hour] = 0;
+    hourly[hour]++;
+  });
+  return Object.entries(hourly).map(([h, visits]) => ({ hour: parseInt(h), visits }));
 }
 
-function getFilteredWeeklyStats(year, week) {
-  const db = get();
+async function getFilteredWeeklyStats(year, week) {
   const startOfYear = new Date(year, 0, 1);
-  const startDate = new Date(startOfYear.getTime() + (week - 1) * 7 * 24 * 60 * 60 * 1000);
-  const endDate = new Date(startDate.getTime() + 6 * 24 * 60 * 60 * 1000);
-  
-  const startTimestamp = Math.floor(startDate.getTime() / 1000);
-  const endTimestamp = Math.floor(endDate.getTime() / 1000);
-  
-  const results = db.prepare(`
-    SELECT pagePath, COUNT(*) as visits, COUNT(DISTINCT userId) as userCount
-    FROM statistics
-    WHERE timestamp >= ? AND timestamp <= ?
-    GROUP BY pagePath
-  `).all(startTimestamp, endTimestamp);
-  
-  return results.map(r => ({ page: r.pagePath, visits: r.visits, userCount: r.userCount }));
+  const startDate = new Date(startOfYear.getTime() + (week - 1) * 7 * 86400000);
+  const endDate = new Date(startDate.getTime() + 6 * 86400000);
+  const start = Math.floor(startDate.getTime() / 1000);
+  const end = Math.floor(endDate.getTime() / 1000);
+
+  const snapshot = await getDb().collection(STATS_COL)
+    .where('timestamp', '>=', start)
+    .where('timestamp', '<=', end)
+    .get();
+  const agg = {};
+  snapshot.forEach(d => {
+    const p = d.data().pagePath || '/';
+    if (!agg[p]) agg[p] = { visits: 0, users: new Set() };
+    agg[p].visits++;
+    agg[p].users.add(d.data().userId);
+  });
+  return Object.entries(agg).map(([page, v]) => ({ page, visits: v.visits, userCount: v.users.size }));
 }
 
-function getFilteredMonthlyStats(year, month) {
-  const db = get();
+async function getFilteredMonthlyStats(year, month) {
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0);
-  
-  const startTimestamp = Math.floor(startDate.getTime() / 1000);
-  const endTimestamp = Math.floor(endDate.getTime() / 1000);
-  
-  const results = db.prepare(`
-    SELECT pagePath, COUNT(*) as visits, COUNT(DISTINCT userId) as userCount
-    FROM statistics
-    WHERE timestamp >= ? AND timestamp <= ?
-    GROUP BY pagePath
-  `).all(startTimestamp, endTimestamp);
-  
-  return results.map(r => ({ page: r.pagePath, visits: r.visits, userCount: r.userCount }));
+  const start = Math.floor(startDate.getTime() / 1000);
+  const end = Math.floor(endDate.getTime() / 1000);
+
+  const snapshot = await getDb().collection(STATS_COL)
+    .where('timestamp', '>=', start)
+    .where('timestamp', '<=', end)
+    .get();
+  const agg = {};
+  snapshot.forEach(d => {
+    const p = d.data().pagePath || '/';
+    if (!agg[p]) agg[p] = { visits: 0, users: new Set() };
+    agg[p].visits++;
+    agg[p].users.add(d.data().userId);
+  });
+  return Object.entries(agg).map(([page, v]) => ({ page, visits: v.visits, userCount: v.users.size }));
+}
+
+async function migrateFromJson() {
+  console.log('[Statistics] Firestore does not require JSON migration.');
+  return 0;
+}
+
+
+async function getDayDetail(dateStr) {
+  const { start, end } = hkDayRange(dateStr);
+  const snapshot = await getDb().collection(STATS_COL)
+    .where('timestamp', '>=', start)
+    .where('timestamp', '<=', end)
+    .get();
+
+  const hourly = {};
+  const pages = {};
+  const users = new Set();
+  let total = 0;
+
+  snapshot.forEach(d => {
+    const data = d.data();
+    total++;
+    users.add(data.userId);
+
+    const hour = new Date(data.timestamp * 1000 + 8 * 3600 * 1000).getHours();
+    hourly[hour] = (hourly[hour] || 0) + 1;
+
+    const p = data.pagePath || '/';
+    if (!pages[p]) pages[p] = { visits: 0, u: new Set() };
+    pages[p].visits++;
+    pages[p].u.add(data.userId);
+  });
+
+  return {
+    date: dateStr,
+    totalVisits: total,
+    uniqueUsers: users.size,
+    hourlyDistribution: Object.entries(hourly)
+      .map(([h, v]) => ({ hour: parseInt(h), visits: v }))
+      .sort((a, b) => a.hour - b.hour),
+    pages: Object.entries(pages)
+      .map(([name, d]) => ({ page: name, visits: d.visits, uniqueUsers: d.u.size }))
+      .sort((a, b) => b.visits - a.visits)
+  };
+}
+
+
+async function getWeekDetail(year, week) {
+  const startOfYear = new Date(year, 0, 1);
+  const startDate = new Date(startOfYear.getTime() + (week - 1) * 7 * 86400000);
+  const endDate = new Date(startDate.getTime() + 6 * 86400000);
+  const start = Math.floor(startDate.getTime() / 1000);
+  const end = Math.floor(endDate.getTime() / 1000);
+
+  const snapshot = await getDb().collection(STATS_COL)
+    .where('timestamp', '>=', start)
+    .where('timestamp', '<=', end)
+    .get();
+
+  const daily = {};
+  const pages = {};
+  const allUsers = new Set();
+  let total = 0;
+
+  snapshot.forEach(d => {
+    const data = d.data();
+    total++;
+    allUsers.add(data.userId);
+
+    const date = new Date(data.timestamp * 1000 + 8 * 3600 * 1000);
+    const day = date.toISOString().slice(0, 10);
+    if (!daily[day]) daily[day] = { visits: 0, users: new Set() };
+    daily[day].visits++;
+    daily[day].users.add(data.userId);
+
+    const p = data.pagePath || '/';
+    if (!pages[p]) pages[p] = { visits: 0, u: new Set() };
+    pages[p].visits++;
+    pages[p].u.add(data.userId);
+  });
+
+  return {
+    year, week,
+    totalVisits: total,
+    uniqueUsers: allUsers.size,
+    dailyTrend: Object.entries(daily).map(([d, v]) => ({
+      date: d, visits: v.visits, uniqueUsers: v.users.size
+    })).sort((a, b) => a.date.localeCompare(b.date)),
+    pages: Object.entries(pages).map(([name, d]) => ({
+      page: name, visits: d.visits, uniqueUsers: d.u.size
+    })).sort((a, b) => b.visits - a.visits)
+  };
+}
+
+async function getMonthDetail(year, month) {
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0);
+  const start = Math.floor(startDate.getTime() / 1000);
+  const end = Math.floor(endDate.getTime() / 1000);
+
+  const snapshot = await getDb().collection(STATS_COL)
+    .where('timestamp', '>=', start)
+    .where('timestamp', '<=', end)
+    .get();
+
+  const daily = {};
+  const pages = {};
+  const allUsers = new Set();
+  let total = 0;
+
+  snapshot.forEach(d => {
+    const data = d.data();
+    total++;
+    allUsers.add(data.userId);
+
+    const date = new Date(data.timestamp * 1000 + 8 * 3600 * 1000);
+    const day = date.toISOString().slice(0, 10);
+    if (!daily[day]) daily[day] = { visits: 0, users: new Set() };
+    daily[day].visits++;
+    daily[day].users.add(data.userId);
+
+    const p = data.pagePath || '/';
+    if (!pages[p]) pages[p] = { visits: 0, u: new Set() };
+    pages[p].visits++;
+    pages[p].u.add(data.userId);
+  });
+
+  return {
+    year, month,
+    totalVisits: total,
+    uniqueUsers: allUsers.size,
+    dailyTrend: Object.entries(daily).map(([d, v]) => ({
+      date: d, visits: v.visits, uniqueUsers: v.users.size
+    })).sort((a, b) => a.date.localeCompare(b.date)),
+    pages: Object.entries(pages).map(([name, d]) => ({
+      page: name, visits: d.visits, uniqueUsers: d.u.size
+    })).sort((a, b) => b.visits - a.visits)
+  };
 }
 
 export default {
@@ -380,5 +433,8 @@ export default {
   getFilteredDailyStats,
   getFilteredPageDailyStats,
   getFilteredWeeklyStats,
-  getFilteredMonthlyStats
+  getFilteredMonthlyStats,
+  getDayDetail,
+  getWeekDetail,
+  getMonthDetail
 };

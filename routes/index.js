@@ -24,10 +24,10 @@ function getUserId(req, res) {
   return userId;
 }
 
-function getNavServices(currentPath) {
-  const currentService = db.services.getEnabled().find(s => s.url === currentPath);
+async function getNavServices(currentPath) {
+  const services = await db.services.getEnabled();
+  const currentService = services.find(s => s.url === currentPath);
   if (!currentService || currentService.showInNav === false) return [];
-  const services = db.services.getEnabled();
   return services.map(s => ({ id: s.id, name: s.name, url: s.url, icon: s.icon }));
 }
 
@@ -50,59 +50,59 @@ router.get('/services', (req, res) => {
 
 
 
-router.get('/public/coursereservation', (req, res) => {
+router.get('/public/coursereservation', async (req, res) => {
   const userId = getUserId(req, res);
   try {
-    db.statistics.recordVisit(userId, '/public/coursereservation');
+    await db.statistics.recordVisit(userId, '/public/coursereservation');
   } catch (e) {
     console.error('[recordVisit] coursereservation error:', e.message);
   }
-  const navServices = getNavServices('/public/coursereservation');
+  const navServices = await getNavServices('/public/coursereservation');
   res.render('coursereservation', { navServices, currentPath: '/public/coursereservation' });
 });
 
-router.get('/public/coupon', (req, res) => {
+router.get('/public/coupon', async (req, res) => {
   const userId = getUserId(req, res);
   try {
-    db.statistics.recordVisit(userId, '/public/coupon');
+    await db.statistics.recordVisit(userId, '/public/coupon');
   } catch (e) {
     console.error('[recordVisit] coupon error:', e.message);
   }
-  const navServices = getNavServices('/public/coupon');
+  const navServices = await getNavServices('/public/coupon');
   res.render('coupon', { navServices, currentPath: '/public/coupon' });
 });
 
-router.get('/public/url-qr-doc-tool', (req, res) => {
+router.get('/public/url-qr-doc-tool', async (req, res) => {
   const userId = getUserId(req, res);
   try {
-    db.statistics.recordVisit(userId, '/public/url-qr-doc-tool');
+    await db.statistics.recordVisit(userId, '/public/url-qr-doc-tool');
   } catch (e) {
     console.error('[recordVisit] url-qr-doc-tool error:', e.message);
   }
-  const navServices = getNavServices('/public/url-qr-doc-tool');
+  const navServices = await getNavServices('/public/url-qr-doc-tool');
   res.render('url-qr-doc-tool', { navServices, currentPath: '/public/url-qr-doc-tool' });
 });
 
-router.get('/mgmt/courses', (req, res) => {
+router.get('/mgmt/courses', async (req, res) => {
   const cookie = req.cookies[ADMIN_COOKIE];
   const isAdmin = cookie === ADMIN_SECRET;
-  const courses = db.courses.getAll();
+  const courses = await db.courses.getAll();
   res.render('admin/courses', { courses, isAdmin });
 });
 
-router.get('/mgmt/services', (req, res) => {
+router.get('/mgmt/services', async (req, res) => {
   const cookie = req.cookies[ADMIN_COOKIE];
   const isAdmin = cookie === ADMIN_SECRET;
-  const allServices = db.services.getAll();
+  const allServices = await db.services.getAll();
   res.render('admin/services', { services: allServices, isAdmin });
 });
 
-router.get('/api/courses', (req, res) => {
-  const courses = db.courses.getAll();
+router.get('/api/courses', async (req, res) => {
+  const courses = await db.courses.getAll();
   res.json(courses);
 });
 
-router.post('/api/courses', (req, res) => {
+router.post('/api/courses', async (req, res) => {
   const { name, description, image, slots } = req.body;
   console.log('=== addCourse request ===');
   console.log('name:', JSON.stringify(name));
@@ -113,7 +113,7 @@ router.post('/api/courses', (req, res) => {
   if (!name || !name.trim()) {
     return res.status(400).json({ error: '名稱不可為空' });
   }
-  const course = db.courses.add({ name, description, image, slots: slots || [] });
+  const course = await db.courses.add({ name, description, image, slots: slots || [] });
   console.log('course after addCourse:', JSON.stringify(course));
   
   if (!course) {
@@ -122,42 +122,42 @@ router.post('/api/courses', (req, res) => {
   res.json(course);
 });
 
-router.get('/api/courses/:id', (req, res) => {
+router.get('/api/courses/:id', async (req, res) => {
   const { id } = req.params;
-  const course = db.courses.getById(id);
+  const course = await db.courses.getById(id);
   if (!course) {
     return res.status(404).json({ error: '課程不存在' });
   }
   res.json(course);
 });
 
-router.put('/api/courses/:id', (req, res) => {
+router.put('/api/courses/:id', async (req, res) => {
   const { id } = req.params;
   const { name, description, image, slots } = req.body;
-  const course = db.courses.updateCourse(id, { name, description, image, slots });
+  const course = await db.courses.updateCourse(id, { name, description, image, slots });
   if (!course) {
     return res.status(404).json({ error: '課程不存在' });
   }
   res.json(course);
 });
 
-router.delete('/api/courses/:id', (req, res) => {
+router.delete('/api/courses/:id', async (req, res) => {
   const { id } = req.params;
-  const success = db.courses.deleteCourse(id);
+  const success = await db.courses.deleteCourse(id);
   if (!success) {
     return res.status(404).json({ error: '課程不存在' });
   }
   res.json({ success: true });
 });
 
-router.put('/api/courses/batch-update', (req, res) => {
+router.put('/api/courses/batch-update', async (req, res) => {
   const { courses } = req.body;
   if (!courses || !Array.isArray(courses)) {
     return res.status(400).json({ error: 'Invalid data' });
   }
-  courses.forEach(update => {
-    db.courses.updateCourse(update.id, update);
-  });
+  for (const update of courses) {
+    await db.courses.updateCourse(update.id, update);
+  }
   res.json({ success: true });
 });
 
@@ -182,7 +182,7 @@ router.post('/api/courses/book', async (req, res) => {
 
   const courseIdNum = parseInt(courseId, 10);
   
-  const course = db.courses.getById(courseIdNum);
+  const course = await db.courses.getById(courseIdNum);
   
   if (!course) {
     return res.status(404).json({ error: '課程不存在' });
@@ -223,7 +223,7 @@ router.post('/api/courses/book', async (req, res) => {
       return s;
     });
     
-    const updated = db.courses.updateCourse(courseIdNum, { slots: newSlots });
+    const updated = await db.courses.updateCourse(courseIdNum, { slots: newSlots });
     
     res.json({ success: true });
   } catch (err) {
@@ -232,12 +232,12 @@ router.post('/api/courses/book', async (req, res) => {
   }
 });
 
-router.get('/api/services', (req, res) => {
-  const services = db.services.getEnabled();
+router.get('/api/services', async (req, res) => {
+  const services = await db.services.getEnabled();
   res.json(services);
 });
 
-router.post('/api/services/update', (req, res) => {
+router.post('/api/services/update', async (req, res) => {
   const { services } = req.body;
   if (!services || !Array.isArray(services)) {
     return res.status(400).json({ error: 'Invalid data' });
@@ -246,7 +246,7 @@ router.post('/api/services/update', (req, res) => {
   if (errors.length > 0) {
     return res.status(400).json({ error: errors.join('; ') });
   }
-  db.services.saveServices({ services });
+  await db.services.saveServices({ services });
   res.json({ success: true });
 });
 
@@ -272,7 +272,7 @@ async function refreshCourseBookingsFromGoogle() {
   const stats = await fetchGoogleSheetStats();
   if (!stats) return false;
 
-  const courses = db.courses.getAll();
+  const courses = await db.courses.getAll();
   let updated = 0;
 
   for (const course of courses) {
@@ -292,7 +292,7 @@ async function refreshCourseBookingsFromGoogle() {
     });
 
     if (needsUpdate) {
-      db.courses.updateCourse(course.id, { slots: newSlots });
+      await db.courses.updateCourse(course.id, { slots: newSlots });
       updated++;
     }
   }

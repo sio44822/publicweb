@@ -1,15 +1,12 @@
-import 'dotenv/config';
+﻿import 'dotenv/config';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import routes from './routes/index.js';
-import { initialize } from './utils/db/schema.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-initialize();
 
 const app = express();
 const PORT = process.env.PORT || 80;
@@ -39,3 +36,4 @@ app.listen(PORT, () => {
   console.log(`Mode: ${isDev ? 'Development (nodemon)' : 'Production'}`);
 });
 }
+

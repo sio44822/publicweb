@@ -67,103 +67,103 @@ router.get('/statistics', (req, res) => {
   res.render('statistics');
 });
 
-router.get('/api/statistics', checkStatsAuth, (req, res) => {
-  const stats = statistics.getStatistics();
+router.get('/api/statistics', checkStatsAuth, async (req, res) => {
+  const stats = await statistics.getStatistics();
   res.json(stats);
 });
 
-router.get('/api/statistics/daily', checkStatsAuth, (req, res) => {
-  const daily = statistics.getDailyStatistics();
+router.get('/api/statistics/daily', checkStatsAuth, async (req, res) => {
+  const daily = await statistics.getDailyStatistics();
   res.json(daily);
 });
 
-router.get('/api/statistics/today', checkStatsAuth, (req, res) => {
-  const today = statistics.getTodayStats();
+router.get('/api/statistics/today', checkStatsAuth, async (req, res) => {
+  const today = await statistics.getTodayStats();
   res.json(today);
 });
 
-router.get('/api/statistics/pages', checkStatsAuth, (req, res) => {
-  const pageStats = statistics.getPageStats();
+router.get('/api/statistics/pages', checkStatsAuth, async (req, res) => {
+  const pageStats = await statistics.getPageStats();
   res.json(pageStats);
 });
 
-router.get('/api/statistics/page/today', checkStatsAuth, (req, res) => {
+router.get('/api/statistics/page/today', checkStatsAuth, async (req, res) => {
   const page = req.query.page;
-  const today = statistics.getTodayPageStats(page);
+  const today = await statistics.getTodayPageStats(page);
   res.json(today);
 });
 
-router.get('/api/statistics/page/daily', checkStatsAuth, (req, res) => {
+router.get('/api/statistics/page/daily', checkStatsAuth, async (req, res) => {
   const page = req.query.page;
   const days = parseInt(req.query.days) || 7;
-  const daily = statistics.getPageDailyTrend(page, days);
+  const daily = await statistics.getPageDailyTrend(page, days);
   res.json(daily);
 });
 
-router.get('/api/statistics/trend', checkStatsAuth, (req, res) => {
+router.get('/api/statistics/trend', checkStatsAuth, async (req, res) => {
   const days = parseInt(req.query.days) || 7;
-  const trend = statistics.getDailyPageStats(days);
+  const trend = await statistics.getDailyPageStats(days);
   res.json(trend);
 });
 
-router.get('/api/statistics/trend/daily', checkStatsAuth, (req, res) => {
+router.get('/api/statistics/trend/daily', checkStatsAuth, async (req, res) => {
   const days = parseInt(req.query.days) || 7;
   const page = req.query.page;
-  const trend = page ? statistics.getPageDailyTrend(page, days) : statistics.getUserTrend(days);
+  const trend = page ? await statistics.getPageDailyTrend(page, days) : await statistics.getUserTrend(days);
   res.json(trend);
 });
 
-router.get('/api/statistics/trend/weekly', checkStatsAuth, (req, res) => {
-  const trend = statistics.getWeekTrend();
+router.get('/api/statistics/trend/weekly', checkStatsAuth, async (req, res) => {
+  const trend = await statistics.getWeekTrend();
   res.json(trend);
 });
 
-router.get('/api/statistics/trend/monthly', checkStatsAuth, (req, res) => {
-  const trend = statistics.getMonthTrend();
+router.get('/api/statistics/trend/monthly', checkStatsAuth, async (req, res) => {
+  const trend = await statistics.getMonthTrend();
   res.json(trend);
 });
 
-router.get('/api/statistics/trend/hour', checkStatsAuth, (req, res) => {
+router.get('/api/statistics/trend/hour', checkStatsAuth, async (req, res) => {
   const hours = parseInt(req.query.hours) || 24;
   const page = req.query.page;
-  const trend = statistics.getPageHourTrend(page, hours);
+  const trend = await statistics.getPageHourTrend(page, hours);
   res.json(trend);
 });
 
-router.get('/api/statistics/filter/daily', checkStatsAuth, (req, res) => {
+router.get('/api/statistics/filter/daily', checkStatsAuth, async (req, res) => {
   const date = req.query.date;
   const page = req.query.page;
   if (!date) {
     return res.status(400).json({ error: 'date required' });
   }
-  const stats = page ? statistics.getFilteredPageDailyStats(page, date) : statistics.getFilteredDailyStats(date);
+  const stats = page ? await statistics.getFilteredPageDailyStats(page, date) : await statistics.getFilteredDailyStats(date);
   res.json(stats);
 });
 
-router.get('/api/statistics/filter/weekly', checkStatsAuth, (req, res) => {
+router.get('/api/statistics/filter/weekly', checkStatsAuth, async (req, res) => {
   const year = parseInt(req.query.year);
   const week = parseInt(req.query.week);
   console.log('[API] /api/statistics/filter/weekly called, year:', year, 'week:', week);
   if (!year || !week) {
     return res.status(400).json({ error: 'year and week required' });
   }
-  const stats = statistics.getFilteredWeeklyStats(year, week);
+  const stats = await statistics.getFilteredWeeklyStats(year, week);
   res.json(stats);
 });
 
-router.get('/api/statistics/filter/monthly', checkStatsAuth, (req, res) => {
+router.get('/api/statistics/filter/monthly', checkStatsAuth, async (req, res) => {
   const year = parseInt(req.query.year);
   const month = parseInt(req.query.month);
   console.log('[API] /api/statistics/filter/monthly called, year:', year, 'month:', month);
   if (!year || !month) {
     return res.status(400).json({ error: 'year and month required' });
   }
-  const stats = statistics.getFilteredMonthlyStats(year, month);
+  const stats = await statistics.getFilteredMonthlyStats(year, month);
   res.json(stats);
 });
 
-router.get('/api/statistics/kpi', checkStatsAuth, (req, res) => {
-  const stats = statistics.getStatistics();
+router.get('/api/statistics/kpi', checkStatsAuth, async (req, res) => {
+  const stats = await statistics.getStatistics();
   const totalVisits = stats.length;
   const uniqueUsers = new Set(stats.map(r => r.userId)).size;
   
@@ -175,7 +175,7 @@ router.get('/api/statistics/kpi', checkStatsAuth, (req, res) => {
   const sortedPages = Object.entries(pageCounts).sort((a, b) => b[1] - a[1]);
   const topService = sortedPages[0] ? { page: sortedPages[0][0], count: sortedPages[0][1] } : null;
   
-  const today = statistics.getTodayStats();
+  const today = await statistics.getTodayStats();
   
   res.json({
     totalVisits,
@@ -186,25 +186,25 @@ router.get('/api/statistics/kpi', checkStatsAuth, (req, res) => {
   });
 });
 
-router.get('/api/statistics/chart', checkStatsAuth, (req, res) => {
+router.get('/api/statistics/chart', checkStatsAuth, async (req, res) => {
   const type = req.query.type || 'daily';
   const page = req.query.page;
   let data;
   
   if (type === 'hourly') {
-    data = statistics.getPageHourTrend(page, 24);
+    data = await statistics.getPageHourTrend(page, 24);
   } else if (type === 'weekly') {
-    data = statistics.getWeekTrend();
+    data = await statistics.getWeekTrend();
   } else if (type === 'monthly') {
-    data = statistics.getMonthTrend();
+    data = await statistics.getMonthTrend();
   } else {
-    data = page ? statistics.getPageDailyTrend(page, 30) : statistics.getUserTrend(30);
+    data = page ? await statistics.getPageDailyTrend(page, 30) : await statistics.getUserTrend(30);
   }
   res.json(data);
 });
 
-router.get('/api/statistics/service-stats', checkStatsAuth, (req, res) => {
-  const stats = statistics.getStatistics();
+router.get('/api/statistics/service-stats', checkStatsAuth, async (req, res) => {
+  const stats = await statistics.getStatistics();
   const pageData = {};
   
   stats.forEach(r => {
@@ -225,8 +225,8 @@ router.get('/api/statistics/service-stats', checkStatsAuth, (req, res) => {
   res.json(result);
 });
 
-router.get('/api/statistics/export', checkStatsAuth, (req, res) => {
-  const stats = statistics.getStatistics();
+router.get('/api/statistics/export', checkStatsAuth, async (req, res) => {
+  const stats = await statistics.getStatistics();
   const page = req.query.page;
   const startDate = req.query.start;
   const endDate = req.query.end;
@@ -249,6 +249,46 @@ router.get('/api/statistics/export', checkStatsAuth, (req, res) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', `attachment; filename=statistics-${new Date().toISOString().split('T')[0]}.csv`);
   res.send(csv);
+});
+
+
+router.get('/api/statistics/day-detail', checkStatsAuth, async (req, res) => {
+  const date = req.query.date;
+  if (!date) return res.status(400).json({ error: 'date required' });
+  try {
+    const detail = await statistics.getDayDetail(date);
+    res.json(detail);
+  } catch (e) {
+    console.error('[day-detail] Error:', e);
+    res.status(500).json({ error: 'Failed to get day detail' });
+  }
+});
+
+
+router.get('/api/statistics/week-detail', checkStatsAuth, async (req, res) => {
+  const year = parseInt(req.query.year);
+  const week = parseInt(req.query.week);
+  if (!year || !week) return res.status(400).json({ error: 'year and week required' });
+  try {
+    const detail = await statistics.getWeekDetail(year, week);
+    res.json(detail);
+  } catch (e) {
+    console.error('[week-detail] Error:', e);
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+router.get('/api/statistics/month-detail', checkStatsAuth, async (req, res) => {
+  const year = parseInt(req.query.year);
+  const month = parseInt(req.query.month);
+  if (!year || !month) return res.status(400).json({ error: 'year and month required' });
+  try {
+    const detail = await statistics.getMonthDetail(year, month);
+    res.json(detail);
+  } catch (e) {
+    console.error('[month-detail] Error:', e);
+    res.status(500).json({ error: 'Failed' });
+  }
 });
 
 export default router;

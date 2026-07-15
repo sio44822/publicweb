@@ -1,105 +1,108 @@
-import { get } from './connection.js';
+﻿import { getDb, Timestamp } from './firebase.js';
 import fs from 'fs';
 
-function getAll() {
-  const rows = get().prepare('SELECT * FROM services').all();
-  return rows.map(row => ({
-    id: String(row.id),
-    name: row.name,
-    description: row.description || '',
-    url: row.url || '',
-    icon: row.icon || '',
-    order: row.order_number,
-    enabled: row.enabled === 1,
-    showInNav: row.show_in_nav !== 0
-  }));
+const COLLECTION = 'services';
+
+const svcMap = (id, data) => ({
+  id: String(id),
+  name: data.name || '',
+  description: data.description || '',
+  url: data.url || '',
+  icon: data.icon || '',
+  order: data.order ?? 0,
+  enabled: data.enabled === true || data.enabled === 1,
+  showInNav: data.showInNav !== false
+});
+
+async function getAll() {
+  const snapshot = await getDb().collection(COLLECTION).orderBy('order', 'asc').get();
+  return snapshot.docs.map(d => svcMap(d.id, d.data()));
 }
 
-function getEnabled() {
-  const rows = get().prepare('SELECT * FROM services WHERE enabled = 1 ORDER BY order_number').all();
-  return rows.map(row => ({
-    id: String(row.id),
-    name: row.name,
-    description: row.description || '',
-    url: row.url || '',
-    icon: row.icon || '',
-    order: row.order_number,
-    enabled: true,
-    showInNav: row.show_in_nav !== 0
-  }));
-}
-
-function getById(id) {
-  const row = get().prepare('SELECT * FROM services WHERE id = ?').get(String(id));
-  if (!row) return null;
-  return {
-    id: String(row.id),
-    name: row.name,
-    description: row.description || '',
-    url: row.url || '',
-    icon: row.icon || '',
-    order: row.order_number,
-    enabled: row.enabled === 1,
-    showInNav: row.show_in_nav !== 0
-  };
-}
-
-function update(id, updates) {
-  const fields = [];
-  const values = [];
-  
-  if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
-  if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description); }
-  if (updates.url !== undefined) { fields.push('url = ?'); values.push(updates.url); }
-  if (updates.icon !== undefined) { fields.push('icon = ?'); values.push(updates.icon); }
-  if (updates.order !== undefined) { fields.push('order_number = ?'); values.push(updates.order); }
-  if (updates.enabled !== undefined) { fields.push('enabled = ?'); values.push(updates.enabled ? 1 : 0); }
-  
-  if (fields.length === 0) return false;
-  
-  fields.push('updated_at = ?');
-  values.push(Math.floor(Date.now() / 1000));
-  values.push(String(id));
-  
-  const stmt = get().prepare('UPDATE services SET ' + fields.join(', ') + ' WHERE id = ?');
-  const result = stmt.run(...values);
-  return result.changes > 0;
-}
-
-function saveServices(config) {
-  const db = get();
-  const transaction = db.transaction(() => {
-    db.prepare('DELETE FROM services').run();
-    const insert = db.prepare('INSERT INTO services (id, name, description, url, icon, order_number, enabled, show_in_nav) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-    for (const svc of config.services) {
-      const showInNav = svc.showInNav !== false ? 1 : 0;
-      insert.run(String(svc.id), svc.name || '', svc.description || '', svc.url || '', svc.icon || '', svc.order || 0, svc.enabled ? 1 : 0, showInNav);
-    }
+async function getEnabled() {
+  const snapshot = await getDb().collection(COLLECTION)
+    .where('enabled', '==', true)
+    .orderBy('order', 'asc')
+    .get();
+  return snapshot.docs.map(d => {
+    const s = svcMap(d.id, d.data());
+    s.enabled = true;
+    return s;
   });
-  transaction();
+}
+
+async function getById(id) {
+  const doc = await getDb().collection(COLLECTION).doc(String(id)).get();
+  if (!doc.exists) return null;
+  return svcMap(doc.id, doc.data());
+}
+
+async function update(id, updates) {
+  const allowed = {};
+  if (updates.name !== undefined) allowed.name = updates.name;
+  if (updates.description !== undefined) allowed.description = updates.description;
+  if (updates.url !== undefined) allowed.url = updates.url;
+  if (updates.icon !== undefined) allowed.icon = updates.icon;
+  if (updates.order !== undefined) allowed.order = updates.order;
+  if (updates.enabled !== undefined) allowed.enabled = updates.enabled ? true : false;
+  if (Object.keys(allowed).length === 0) return false;
+  allowed.updatedAt = Timestamp.now();
+
+  await getDb().collection(COLLECTION).doc(String(id)).update(allowed);
   return true;
 }
 
-function migrateFromJson(jsonPath) {
-  
+async function saveServices(config) {
+  const now = Timestamp.now();
+  const batch = getDb().batch();
+  const existing = await getDb().collection(COLLECTION).listDocuments();
+  for (const ref of existing) batch.delete(ref);
+
+  for (const svc of (config.services || [])) {
+    const ref = getDb().collection(COLLECTION).doc(String(svc.id));
+    batch.set(ref, {
+      name: svc.name || '',
+      description: svc.description || '',
+      url: svc.url || '',
+      icon: svc.icon || '',
+      order: svc.order ?? 0,
+      enabled: svc.enabled === true || svc.enabled === 1,
+      showInNav: svc.showInNav !== false,
+      createdAt: now,
+      updatedAt: now
+    });
+  }
+  await batch.commit();
+  return true;
+}
+
+async function migrateFromJson(jsonPath) {
   const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-  const db = get();
-  const transaction = db.transaction(() => {
-    db.prepare('DELETE FROM services').run();
-    const insert = db.prepare('INSERT INTO services (id, name, description, url, icon, order_number, enabled) VALUES (?, ?, ?, ?, ?, ?, ?)');
-    for (const svc of (data.services || [])) {
-      insert.run(String(svc.id), svc.name || '', svc.description || '', svc.url || '', svc.icon || '', svc.order || 0, svc.enabled ? 1 : 0);
-    }
-  });
-  transaction();
-  return data.services ? data.services.length : 0;
+  const now = Timestamp.now();
+  const batch = getDb().batch();
+  for (const svc of (data.services || [])) {
+    const ref = getDb().collection(COLLECTION).doc(String(svc.id));
+    batch.set(ref, {
+      name: svc.name || '',
+      description: svc.description || '',
+      url: svc.url || '',
+      icon: svc.icon || '',
+      order: svc.order ?? 0,
+      enabled: svc.enabled === true || svc.enabled === 1,
+      showInNav: svc.showInNav !== false,
+      createdAt: now,
+      updatedAt: now
+    });
+  }
+  await batch.commit();
+  return (data.services || []).length;
 }
 
 function validateServices(services) {
   const errors = [];
   services.forEach((s, i) => {
-    if (!s.name || !String(s.name).trim()) errors.push(`第 ${i + 1} 項：名稱不可為空`);
-    if (!s.url || !String(s.url).trim()) errors.push(`第 ${i + 1} 項：網址不可為空`);
+    if (!s.name || !String(s.name).trim()) errors.push('第' + (i + 1) + '個服務名稱不可為空白');
+    if (!s.url || !String(s.url).trim()) errors.push('第' + (i + 1) + '個服務URL不可為空白');
   });
   return errors;
 }
