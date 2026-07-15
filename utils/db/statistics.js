@@ -378,11 +378,19 @@ async function getWeekDetail(year, week, page) {
     pages[p].u.add(data.userId);
   });
 
+  // Fill in missing days
+  var fill = {};
+  var cur = new Date(startDate.getTime());
+  while (cur <= endDate) {
+    var ds = cur.toISOString().slice(0, 10);
+    fill[ds] = daily[ds] || { visits: 0, users: new Set() };
+    cur.setDate(cur.getDate() + 1);
+  }
   return {
     year, week,
     totalVisits: total,
     uniqueUsers: allUsers.size,
-    dailyTrend: Object.entries(daily).map(([d, v]) => ({
+    dailyTrend: Object.entries(fill).map(([d, v]) => ({
       date: d, visits: v.visits, uniqueUsers: v.users.size
     })).sort((a, b) => a.date.localeCompare(b.date)),
     pages: Object.entries(pages).map(([name, d]) => ({
@@ -425,11 +433,18 @@ async function getMonthDetail(year, month, page) {
     pages[p].u.add(data.userId);
   });
 
+  var fill = {};
+  var cur = new Date(startDate.getTime());
+  while (cur <= endDate) {
+    var ds = cur.toISOString().slice(0, 10);
+    fill[ds] = daily[ds] || { visits: 0, users: new Set() };
+    cur.setDate(cur.getDate() + 1);
+  }
   return {
     year, month,
     totalVisits: total,
     uniqueUsers: allUsers.size,
-    dailyTrend: Object.entries(daily).map(([d, v]) => ({
+    dailyTrend: Object.entries(fill).map(([d, v]) => ({
       date: d, visits: v.visits, uniqueUsers: v.users.size
     })).sort((a, b) => a.date.localeCompare(b.date)),
     pages: Object.entries(pages).map(([name, d]) => ({

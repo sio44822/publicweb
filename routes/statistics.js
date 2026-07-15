@@ -314,5 +314,44 @@ router.post('/api/statistics/monitoring-toggle', checkStatsAuth, async (req, res
   }
 });
 
+
+router.get('/api/statistics/kpi-summary', checkStatsAuth, async (req, res) => {
+  try {
+    const allStats = await statistics.getStatistics();
+    const totalVisits = allStats.length;
+    const totalUsers = new Set(allStats.map(r => r.userId)).size;
+
+    const now = new Date();
+    now.setHours(now.getHours() + 8);
+    var today = now.toISOString().slice(0, 10);
+
+    var weekStart = new Date(now.getTime());
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getUTCDay()||7)-1));
+    var ws = weekStart.toISOString().slice(0, 10);
+
+    var monthStart = now.getUTCFullYear() + "-" + String(now.getUTCMonth()+1).padStart(2,"0") + "-01";
+
+    var todayV = 0, weekV = 0, monthV = 0;
+    var todayU = new Set(), weekU = new Set(), monthU = new Set();
+
+    allStats.forEach(function(r) {
+      var d = (r.time || "").slice(0, 10);
+      if (d === today) { todayV++; todayU.add(r.userId); }
+      if (d >= ws) { weekV++; weekU.add(r.userId); }
+      if (d >= monthStart) { monthV++; monthU.add(r.userId); }
+    });
+
+    res.json({
+      totalVisits: totalVisits, totalUsers: totalUsers,
+      todayVisits: todayV, todayUsers: todayU.size,
+      weekVisits: weekV, weekUsers: weekU.size,
+      monthVisits: monthV, monthUsers: monthU.size
+    });
+  } catch(e) {
+    console.error("[kpi-summary] Error:", e);
+    res.status(500).json({ error: "Failed" });
+  }
+});
+
 export default router;
 

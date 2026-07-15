@@ -199,29 +199,12 @@ function doLogout() {
 // ── Dashboard Load ──
 async function loadDashboard() {
   try {
-    // Load all daily stats for KPIs
-    state.allDailyStats = await api('/api/statistics/daily');
-    const dailies = Object.values(state.allDailyStats);
-    const todayKey = hkDate(new Date());
-    const today = state.allDailyStats[todayKey] || {visitCount:0,userCount:0};
-    let weekV=0, monthV=0;
-    const now = new Date();
-    const nowHK = hkDateObj(now);
-    const monthStart = nowHK.getUTCFullYear()+'-'+String(nowHK.getUTCMonth()+1).padStart(2,'0')+'-01';
-    dailies.forEach(d=>{
-      if (d.date) {
-        if (d.date >= monthStart) monthV += d.visitCount || 0;
-      }
-    });
-    // Simple week calc
-    const weekStart = new Date(nowHK.getTime() - (nowHK.getDay()||7)*86400000 + 86400000);
-    const ws = weekStart.getUTCFullYear()+'-'+String(weekStart.getUTCMonth()+1).padStart(2,'0')+'-'+String(weekStart.getUTCDate()).padStart(2,'0');
-    dailies.forEach(d=>{if(d.date&&d.date>=ws)weekV+=d.visitCount||0;});
-
-    document.getElementById('kpiDayVisits').textContent = today.visitCount||0;
-    document.getElementById('kpiDayUsers').textContent = today.userCount||0;
-    document.getElementById('kpiWeekVisits').textContent = weekV;
-    document.getElementById('kpiMonthVisits').textContent = monthV;
+    // Load KPI summary from API
+    var kpi = await api('/api/statistics/kpi-summary');
+    document.getElementById('kpiDayVisits').textContent = kpi.todayVisits;
+    document.getElementById('kpiDayUsers').textContent = kpi.todayUsers;
+    document.getElementById('kpiWeekVisits').textContent = kpi.weekVisits;
+    document.getElementById('kpiMonthVisits').textContent = kpi.monthVisits;
 
     // Load service filter
     const svcRes = await api('/api/statistics/service-stats');
