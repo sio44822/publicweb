@@ -9,3 +9,5 @@ logs/
 .idea/
 .vscode/
 data/
+.vercel
+api/node_modules

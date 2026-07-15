@@ -21,6 +21,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.use(routes);
 
+// Export for Vercel serverless runtime
+module.exports = app;
+
+// Only start the server when running locally (not on Vercel)
+if (!process.env.VERCEL) {
 app.listen(PORT, () => {
   const isDev = process.env.NODE_ENV === 'development';
   const URLBASE = isDev 
@@ -30,3 +35,4 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT} ${URLBASE}`);
   console.log(`Mode: ${isDev ? 'Development (nodemon)' : 'Production'}`);
 });
+}

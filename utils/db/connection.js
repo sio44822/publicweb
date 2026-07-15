@@ -6,6 +6,10 @@ const getDbPath = () => {
   if (process.env.DATABASE_PATH) {
     return process.env.DATABASE_PATH;
   }
+  // On Vercel, database must be in /tmp (read-write directory)
+  if (process.env.VERCEL) {
+    return path.join('/tmp', 'publicweb.db');
+  }
   return path.join(__dirname, '../../data/publicweb.db');
 };
 
