@@ -1,5 +1,5 @@
-const fs = require('fs');
-const { get } = require('./connection');
+import fs from 'fs';
+import { get } from './connection.js';
 
 /**
  * Get all courses from database
@@ -164,7 +164,7 @@ function migrateFromJson(jsonPath) {
   return courses.length;
 }
 
-module.exports = {
+export default {
   getAll,
   getById,
   add,

@@ -1,6 +1,10 @@
-const fs = require('fs');
-const path = require('path');
-const { get } = require('./connection');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { get } from './connection.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const DATA_DIR = path.join(__dirname, '..', '..', 'data');
 const STATISTICS_FILE = path.join(DATA_DIR, 'coupon-statistics.json');
@@ -357,7 +361,7 @@ function getFilteredMonthlyStats(year, month) {
   return results.map(r => ({ page: r.pagePath, visits: r.visits, userCount: r.userCount }));
 }
 
-module.exports = {
+export default {
   recordVisit,
   getTodayStats,
   getPageStats,

@@ -1,5 +1,9 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const SERVICES_FILE = path.join(DATA_DIR, 'services.json');
@@ -63,7 +67,7 @@ function validateServices(services) {
   return errors;
 }
 
-module.exports = {
+export default {
   getServices,
   saveServices,
   getEnabledServices,

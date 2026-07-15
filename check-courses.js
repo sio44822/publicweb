@@ -1,5 +1,6 @@
-const db = require('./utils/db/connection');
-const con = db.get();
+import { get } from './utils/db/connection.js';
+
+const con = get();
 const courses = con.prepare('SELECT id, name, slots FROM courses').all();
 console.log('Total courses:', courses.length);
 courses.forEach(c => {

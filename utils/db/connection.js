@@ -1,5 +1,9 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+import Database from 'better-sqlite3';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Get database path from environment or default to data/publicweb.db
 const getDbPath = () => {
@@ -44,4 +48,4 @@ const get = () => {
   return db;
 };
 
-module.exports = { open, close, get, getDbPath };
+export { open, close, get, getDbPath };

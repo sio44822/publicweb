@@ -1,5 +1,5 @@
-const path = require('path');
-const { get } = require('./connection');
+import { get } from './connection.js';
+import fs from 'fs';
 
 function getAll() {
   const rows = get().prepare('SELECT * FROM services').all();
@@ -81,7 +81,7 @@ function saveServices(config) {
 }
 
 function migrateFromJson(jsonPath) {
-  const fs = require('fs');
+  
   const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
   const db = get();
   const transaction = db.transaction(() => {
@@ -104,7 +104,7 @@ function validateServices(services) {
   return errors;
 }
 
-module.exports = {
+export default {
   getAll,
   getEnabled,
   getById,

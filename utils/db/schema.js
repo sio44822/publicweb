@@ -1,4 +1,4 @@
-const { get } = require('./connection');
+import { get } from './connection.js';
 
 // Create all tables
 const createTables = () => {
@@ -76,4 +76,4 @@ const initialize = () => {
   createTables();
 };
 
-module.exports = { createTables, dropTables, initialize };
+export { createTables, dropTables, initialize };

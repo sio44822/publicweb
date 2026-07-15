@@ -1,5 +1,5 @@
-const express = require('express');
-const statistics = require('../utils/db/statistics');
+import express from 'express';
+import statistics from '../utils/db/statistics.js';
 
 const router = express.Router();
 
@@ -251,4 +251,4 @@ router.get('/api/statistics/export', checkStatsAuth, (req, res) => {
   res.send(csv);
 });
 
-module.exports = router;
+export default router;

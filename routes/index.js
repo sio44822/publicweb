@@ -1,8 +1,7 @@
-const express = require('express');
-const path = require('path');
-const { v4: uuidv4 } = require('uuid');
-const db = require('../utils/db');
-const statisticsRoutes = require('./statistics');
+import express from 'express';
+import { v4 as uuidv4 } from 'uuid';
+import db from '../utils/db/index.js';
+import statisticsRoutes from './statistics.js';
 
 const router = express.Router();
 
@@ -339,4 +338,4 @@ setTimeout(() => {
   });
 }, 2000);
 
-module.exports = router;
+export default router;
