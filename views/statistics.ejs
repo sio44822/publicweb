@@ -45,6 +45,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
       <h1 class="text-2xl font-bold text-slate-800">📊 統計儀表板</h1>
       <p class="text-sm text-slate-400 mt-0.5" id="headerSubtitle">即時網站訪問統計</p>
     </div>
+    <div class="flex items-center gap-3">
+      <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-500" id="monitoringLabel">
+        <span>監測</span>
+        <div class="relative w-10 h-5 rounded-full transition-colors" id="monitoringToggle" onclick="toggleMonitoring()" style="background:#cbd5e1">
+          <div class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform" id="monitoringKnob" style="transform:translateX(0)"></div>
+        </div>
+      </label>
+    </div>
     <div class="flex gap-2">
       <button onclick="exportCSV()"
         class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium flex items-center gap-1.5 transition">
@@ -101,36 +109,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     </div>
     <div class="card p-4 lg:col-span-2 fade-in">
       <h3 class="font-bold text-slate-800 text-sm mb-3">各服務統計</h3>
-      <div class="h-64"><canvas id="serviceChart"></canvas></div>
+      <div class="h-64"><div id="serviceChart" class="h-64 overflow-y-auto"></div></div>
     </div>
   </div>
 
-  <!-- Data Table -->
-  <div class="card overflow-hidden fade-in mb-6">
-    <div class="px-4 py-3 border-b border-slate-100 flex flex-wrap justify-between items-center gap-2">
-      <h3 class="font-bold text-slate-800 text-sm">明細記錄</h3>
-      <div class="flex gap-2">
-        <input type="text" id="searchInput" oninput="filterTable()" placeholder="搜尋頁面或用戶…"
-          class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs w-40 focus:outline-none focus:ring-2 focus:ring-blue-400">
-      </div>
-    </div>
-    <div class="overflow-x-auto max-h-80">
-      <table class="w-full text-xs">
-        <thead class="bg-slate-50 sticky top-0 text-slate-500">
-          <tr>
-            <th class="py-2.5 px-3 text-left font-medium cursor-pointer select-none" onclick="sortBy('time')">時間</th>
-            <th class="py-2.5 px-3 text-left font-medium cursor-pointer select-none" onclick="sortBy('page')">頁面</th>
-            <th class="py-2.5 px-3 text-left font-medium">用戶 ID</th>
-          </tr>
-        </thead>
-        <tbody id="recordsTable"></tbody>
-      </table>
-    </div>
-    <div class="px-4 py-2.5 border-t border-slate-100 text-xs text-slate-400 flex justify-between">
-      <span id="tableInfo">載入中…</span>
-      <span id="totalStats"></span>
-    </div>
-  </div>
+
 </div>
 
 <!-- Toast -->
@@ -179,7 +162,7 @@ async function api(url) {
 async function checkAuth() {
   try {
     const d = await api('/api/stats/check');
-    if (d.authenticated) { showDash(); loadDashboard(); }
+    if (d.authenticated) { showDash(); loadDashboard(); loadMonitoringStatus(); }
     else showLogin();
   } catch(e){showLogin()}
 }
@@ -203,7 +186,7 @@ async function doLogin() {
       headers:{'Content-Type':'application/x-www-form-urlencoded'},
       body:'username=admin&password='+encodeURIComponent(p)
     });
-    if (r.ok) { showDash(); loadDashboard(); }
+    if (r.ok) { showDash(); loadDashboard(); loadMonitoringStatus(); }
     else { document.getElementById('loginError').classList.remove('hidden'); }
   } catch(e){}
 }
@@ -313,11 +296,7 @@ async function loadDayView(dateStr) {
     renderServiceChart(data.pages||[]);
     renderKPIDetail(data.totalVisits, data.uniqueUsers);
     // Load records
-    const records = await api('/api/statistics/statistics');
-    const filter = state.serviceFilter;
-    const filtered = filter ? records.filter(r=>r.pagePath===filter) : records;
-    renderTable(filtered);
-    document.getElementById('totalStats').textContent = '共 ' + filtered.length + ' 筆';
+
   } catch(e){console.error(e)}
 }
 
@@ -330,9 +309,7 @@ async function loadWeekView(year, week) {
     renderTrendChartDaily(data.dailyTrend||[]);
     renderServiceChart(data.pages||[]);
     renderKPIDetail(data.totalVisits, data.uniqueUsers);
-    const records = await api('/api/statistics/statistics');
-    renderTable(records);
-    document.getElementById('totalStats').textContent = '本週 ' + (data.totalVisits||0) + ' 次訪問';
+
   } catch(e){console.error(e)}
 }
 
@@ -345,9 +322,7 @@ async function loadMonthView(year, month) {
     renderTrendChartDaily(data.dailyTrend||[]);
     renderServiceChart(data.pages||[]);
     renderKPIDetail(data.totalVisits, data.uniqueUsers);
-    const records = await api('/api/statistics/statistics');
-    renderTable(records);
-    document.getElementById('totalStats').textContent = '本月 ' + (data.totalVisits||0) + ' 次訪問';
+
   } catch(e){console.error(e)}
 }
 
@@ -366,10 +341,7 @@ async function loadOverview() {
     renderTrendChartDaily(last30);
     renderServiceChart(svcData);
     renderKPIDetail(records.length, new Set(records.map(r=>r.userId)).size);
-    const filter = state.serviceFilter;
-    const filtered = filter ? records.filter(r=>r.pagePath===filter) : records;
-    renderTable(filtered);
-    document.getElementById('totalStats').textContent = '總計 ' + records.length + ' 次訪問';
+
   } catch(e){console.error(e)}
 }
 
@@ -383,7 +355,7 @@ function renderTrendChartHourly(hourly) {
   const labels = Array.from({length:24},(_,i)=>i+'時');
   const data = Array(24).fill(0);
   (hourly||[]).forEach(h=>{if(h.hour>=0&&h.hour<24)data[h.hour]=h.visits});
-  renderChart('trendChart', 'bar', labels, [{label:'訪問次數',data,backgroundColor:'#3b82f6'}]);
+  renderChart('trendChart', 'line', labels, [{label:'訪問次數',data:data,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.1)',tension:0.3,fill:true}]);
 }
 
 function renderTrendChartDaily(daily) {
@@ -398,20 +370,38 @@ function renderTrendChartDaily(daily) {
 }
 
 function renderServiceChart(data) {
-  if (!data||!data.length) return;
-  const top = data.slice(0,10);
-  const labels = top.map(d=>d.page||'/');
-  const visits = top.map(d=>d.visits||0);
-  const colors = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1'];
-  renderChart('serviceChart', 'bar', labels, [{
-    label:'訪問次數',data:visits,backgroundColor:colors.slice(0,top.length)
-  }], {indexAxis:'y',plugins:{legend:{display:false}}});
+  const el = document.getElementById('serviceChart');
+  if (!data||!data.length) {
+    el.innerHTML = '<div class="flex items-center justify-center h-full text-slate-400 text-sm">暂無資料</div>';
+    return;
+  }
+  const total = data.reduce((s,d)=>s+(d.visits||0),0);
+  let html = '<div class="space-y-0.5">';
+  data.slice(0,15).forEach((s,i) => {
+    const pct = total > 0 ? ((s.visits||0)/total*100).toFixed(1) : 0;
+    html += '<div class="flex items-center justify-between py-1.5 px-3 rounded-lg hover:bg-slate-50 transition">';
+    html += '<div class="flex items-center gap-2 min-w-0">';
+    html += '<span class="w-2 h-2 rounded-full shrink-0" style="background:'+getColor(i)+'"></span>';
+    html += '<span class="text-sm text-slate-700 truncate">'+(s.page||'/')+'</span>';
+    html += '</div>';
+    html += '<div class="flex items-center gap-3 shrink-0">';
+    html += '<span class="text-xs text-slate-400 w-10 text-right">'+pct+'%</span>';
+    html += '<span class="text-sm font-bold text-blue-600 w-16 text-right">'+(s.visits||0)+' 次</span>';
+    html += '</div></div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function getColor(i) {
+  const colors = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1','#14b8a6','#a855f7','#e11d48','#65a30d','#0d9488'];
+  return colors[i % colors.length];
 }
 
 function renderChart(canvasId, type, labels, datasets, extraOpts) {
   const ctx = document.getElementById(canvasId).getContext('2d');
   if (state.trendChart && canvasId==='trendChart') state.trendChart.destroy();
-  if (state.serviceChart && canvasId==='serviceChart') state.serviceChart.destroy();
+
   const chart = new Chart(ctx, {
     type, data:{labels,datasets},
     options:Object.assign({
@@ -425,49 +415,20 @@ function renderChart(canvasId, type, labels, datasets, extraOpts) {
 }
 
 // ── Table ──
-function renderTable(records) {
-  state.allRecords = records;
-  filterTable();
-}
 
-function filterTable() {
-  const q = (document.getElementById('searchInput').value||'').toLowerCase();
-  const filtered = state.allRecords.filter(r=>
-    (r.pagePath||'').toLowerCase().includes(q)||(r.userId||'').toLowerCase().includes(q)
-  );
-  const sorted = [...filtered].sort((a,b)=>{
-    let va=a[state.sortCol], vb=b[state.sortCol];
-    if (state.sortCol==='time'){va=new Date(va);vb=new Date(vb)}
-    return state.sortAsc ? (va>vb?1:-1) : (va<vb?1:-1);
-  });
-  const tbody = document.getElementById('recordsTable');
-  tbody.innerHTML = sorted.slice(0,200).map(r=>
-    '<tr class="border-b border-slate-50 hover:bg-slate-50">'+
-    '<td class="py-2 px-3 text-slate-600 whitespace-nowrap">'+((r.time||'').replace('T',' ').slice(0,19)||'-')+'</td>'+
-    '<td class="py-2 px-3 text-slate-800">'+(r.pagePath||'/')+'</td>'+
-    '<td class="py-2 px-3 text-slate-400 font-mono text-[10px]" title="'+(r.userId||'')+'">'+(r.userId||'').slice(0,8)+'…</td>'+
-    '</tr>'
-  ).join('');
-  document.getElementById('tableInfo').textContent = '顯示 ' + Math.min(200,sorted.length) + ' / ' + sorted.length + ' 筆';
-}
-
-function sortBy(col) {
-  if (state.sortCol===col) state.sortAsc=!state.sortAsc;
-  else {state.sortCol=col;state.sortAsc=false}
-  filterTable();
-}
-
-function exportCSV() {
-  const records = state.allRecords;
-  if (!records.length) return;
-  let csv = '時間,頁面,用戶ID\n';
-  csv += records.map(r=>r.time+','+(r.pagePath||'/')+','+r.userId).join('\n');
-  const blob = new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'statistics-'+hkDate(new Date())+'.csv';
-  a.click();
-  showToast('CSV 已下載');
+async function exportCSV() {
+  try {
+    const records = await api('/api/statistics/statistics');
+    if (!records||!records.length) { showToast('無資料可匯出'); return; }
+    let csv = '時間,頁面,用戶ID\n';
+    csv += records.map(r=>r.time+','+(r.pagePath||'/')+','+r.userId).join('\n');
+    const blob = new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'statistics-'+hkDate(new Date())+'.csv';
+    a.click();
+    showToast('CSV 已下載');
+  } catch(e) { showToast('匯出失敗'); }
 }
 
 function showToast(msg) {
@@ -478,7 +439,30 @@ function showToast(msg) {
   setTimeout(()=>{t.classList.add('hidden')},2000);
 }
 
-checkAuth();
+async function loadMonitoringStatus() {
+  try {
+    const r = await api('/api/statistics/monitoring-status');
+    updateMonitoringUI(r.monitoringEnabled);
+  } catch(e){}
+}
+
+function updateMonitoringUI(enabled) {
+  const toggle = document.getElementById('monitoringToggle');
+  const knob = document.getElementById('monitoringKnob');
+  if (!toggle || !knob) return;
+  toggle.style.background = enabled ? '#22c55e' : '#cbd5e1';
+  knob.style.transform = enabled ? 'translateX(20px)' : 'translateX(0)';
+}
+
+async function toggleMonitoring() {
+  try {
+    const r = await fetch('/api/statistics/monitoring-toggle', { method:'POST', credentials:'include' });
+    const data = await r.json();
+    updateMonitoringUI(data.monitoringEnabled);
+  } catch(e){}
+}
+
+        checkAuth();
 </script>
 </body>
 </html>

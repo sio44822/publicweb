@@ -93,8 +93,9 @@ router.get('/mgmt/courses', async (req, res) => {
 router.get('/mgmt/services', async (req, res) => {
   const cookie = req.cookies[ADMIN_COOKIE];
   const isAdmin = cookie === ADMIN_SECRET;
+  const showAdvanced = req.cookies.show_advanced === 'true';
   const allServices = await db.services.getAll();
-  res.render('admin/services', { services: allServices, isAdmin });
+  res.render('admin/services', { services: allServices, isAdmin, showAdvanced });
 });
 
 router.get('/api/courses', async (req, res) => {
@@ -337,5 +338,14 @@ setTimeout(() => {
     console.error('[Startup] Sync failed:', err);
   });
 }, 2000);
+
+router.post('/api/services/verify-advanced', (req, res) => {
+  const { password } = req.body;
+  if (password === ADMIN_PASSWORD) {
+    res.cookie('show_advanced', 'true', { maxAge: 30 * 24 * 60 * 60 * 1000, httpOnly: true });
+    return res.json({ ok: true });
+  }
+  res.status(401).json({ error: 'Invalid password' });
+});
 
 export default router;

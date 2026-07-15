@@ -11,7 +11,8 @@ const svcMap = (id, data) => ({
   icon: data.icon || '',
   order: data.order ?? 0,
   enabled: data.enabled === true || data.enabled === 1,
-  showInNav: data.showInNav !== false
+  showInNav: data.showInNav !== false,
+  isAdvanced: data.isAdvanced === true
 });
 
 async function getAll() {
@@ -39,6 +40,7 @@ async function update(id, updates) {
   if (updates.icon !== undefined) allowed.icon = updates.icon;
   if (updates.order !== undefined) allowed.order = updates.order;
   if (updates.enabled !== undefined) allowed.enabled = updates.enabled ? true : false;
+  if (updates.isAdvanced !== undefined) allowed.isAdvanced = updates.isAdvanced ? true : false;
   if (Object.keys(allowed).length === 0) return false;
   allowed.updatedAt = Timestamp.now();
 
@@ -62,6 +64,7 @@ async function saveServices(config) {
       order: svc.order ?? 0,
       enabled: svc.enabled === true || svc.enabled === 1,
       showInNav: svc.showInNav !== false,
+      isAdvanced: svc.isAdvanced === true,
       createdAt: now,
       updatedAt: now
     });
@@ -84,6 +87,7 @@ async function migrateFromJson(jsonPath) {
       order: svc.order ?? 0,
       enabled: svc.enabled === true || svc.enabled === 1,
       showInNav: svc.showInNav !== false,
+      isAdvanced: svc.isAdvanced === true,
       createdAt: now,
       updatedAt: now
     });

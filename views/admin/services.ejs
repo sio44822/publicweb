@@ -57,7 +57,12 @@
 
         <div class="bg-white rounded-xl border border-gray-100 overflow-hidden fade-in">
             <div class="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between text-sm">
-                <span class="font-bold text-gray-700">服務列表</span>
+                <div class="flex items-center gap-3">
+                    <span class="font-bold text-gray-700">服務列表</span>
+                    <button id="advancedToggle" onclick="promptAdvanced()" class="px-3 py-1 rounded-full text-xs font-bold <%= showAdvanced ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400' %>">
+                        <%= showAdvanced ? '進階' : '基本' %>
+                    </button>
+                </div>
                 <button onclick="openAddModal()" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg">+ 新增</button>
             </div>
             <div class="overflow-x-auto">
@@ -70,6 +75,7 @@
                             <th class="px-2 py-2 text-left w-32">說明</th>
                             <th class="px-2 py-2 text-left w-40">路徑</th>
                             <th class="px-2 py-2 text-center w-16">導航</th>
+                            <th class="px-2 py-2 text-center w-16">進階</th>
                             <th class="px-2 py-2 text-center w-16">狀態</th>
                             <th class="px-2 py-2 text-center w-10">操作</th>
                         </tr>
@@ -111,6 +117,7 @@
     <script>
         let servicesData = <%- JSON.stringify(services) %>;
         const isAdmin = <%- isAdmin %>;
+        const showAdvanced = '<%- showAdvanced === true ? "true" : "false" %>' === 'true';
 
         function doLogin() {
             const pass = document.getElementById('adminPass').value;
@@ -180,6 +187,11 @@
                         </button>
                     </td>
                     <td class="px-2 py-2 text-center">
+                        <button onclick="toggleAdvanced('${svc.id}')" class="px-2 py-1 rounded-full text-xs font-bold ${svc.isAdvanced ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'}">
+                            ${svc.isAdvanced ? '進階' : '基本'}
+                        </button>
+                    </td>
+                    <td class="px-2 py-2 text-center">
                         <button onclick="toggleEnabled('${svc.id}')" class="px-2 py-1 rounded-full text-xs font-bold ${svc.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}">
                             ${svc.enabled ? '啟用' : '停用'}
                         </button>
@@ -232,6 +244,62 @@
             } catch (err) { alert('儲存失敗'); }
         }
 
+        async function toggleAdvanced(id) {
+            const svc = servicesData.find(s => s.id === id);
+            if (!svc) return;
+            svc.isAdvanced = !svc.isAdvanced;
+            await saveData();
+        }
+
+        function promptAdvanced() {
+            if (showAdvanced) {
+                // Already in advanced mode, switch back to basic
+                showAdvanced = false;
+                document.cookie = 'show_advanced=; max-age=0; path=/';
+                updateAdvancedUI();
+                render();
+            } else {
+                document.getElementById('advancedPass').value = '';
+                document.getElementById('advancedError').classList.add('hidden');
+                document.getElementById('advancedModal').classList.remove('hidden');
+                setTimeout(()=>document.getElementById('advancedPass').focus(), 100);
+            }
+        }
+
+        function closeAdvancedModal() {
+            document.getElementById('advancedModal').classList.add('hidden');
+        }
+
+        async function doAdvancedLogin() {
+            const pass = document.getElementById('advancedPass').value;
+            try {
+                const res = await fetch('/api/services/verify-advanced', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({password: pass})
+                });
+                if (res.ok) {
+                    showAdvanced = true;
+                    document.getElementById('advancedModal').classList.add('hidden');
+                    updateAdvancedUI();
+                    render();
+                } else {
+                    document.getElementById('advancedError').classList.remove('hidden');
+                }
+            } catch(e) {
+                document.getElementById('advancedError').classList.remove('hidden');
+            }
+        }
+
+        function updateAdvancedUI() {
+            const btn = document.getElementById('advancedToggle');
+            if (btn) {
+                btn.textContent = showAdvanced ? '進階' : '基本';
+                btn.className = showAdvanced
+                    ? 'px-3 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-700'
+                    : 'px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-400';
+            }
+        }
+
         if (isAdmin) {
             document.getElementById('loginPanel').classList.add('hidden');
             document.getElementById('mainPanel').classList.remove('hidden');
@@ -278,5 +346,21 @@
             closeAddModal();
         }
     </script>
+    <!-- Advanced Password Modal -->
+    <div id="advancedModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-[500] p-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-xl font-bold mb-2">切換到進階模式</h3>
+            <p class="text-sm text-gray-400 mb-4">請輸入管理員密碼</p>
+            <form onsubmit="doAdvancedLogin(); return false;">
+            <input type="password" id="advancedPass" class="w-full px-4 py-3 bg-gray-50 border-2 border-gray-100 rounded-xl mb-4" placeholder="密碼">
+            <div class="flex gap-2">
+                <button type="submit" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl">確認</button>
+                <button type="button" onclick="closeAdvancedModal()" class="px-5 bg-gray-200 hover:bg-gray-300 text-gray-600 font-bold py-3 rounded-xl">取消</button>
+            </div>
+        </form>
+            <p id="advancedError" class="text-red-500 text-sm mt-3 hidden">密碼錯誤</p>
+        </div>
+    </div>
+
 </body>
 </html>

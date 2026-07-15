@@ -33,7 +33,26 @@ function hkDayRange(dateStr) {
   return { start, end };
 }
 
+var monitoringCache = null;
+
+async function isMonitoringEnabled() {
+  if (monitoringCache !== null) return monitoringCache;
+  try {
+    const doc = await getDb().collection('config').doc('settings').get();
+    monitoringCache = doc.exists ? (doc.data().monitoringEnabled !== false) : true;
+  } catch(e) {
+    monitoringCache = true;
+  }
+  return monitoringCache;
+}
+
+async function setMonitoringEnabled(val) {
+  monitoringCache = val;
+  await getDb().collection('config').doc('settings').set({ monitoringEnabled: val, updatedAt: Timestamp.now() }, { merge: true });
+}
+
 async function recordVisit(userId, pagePath = '/') {
+  if (!(await isMonitoringEnabled())) return 0;
   const timestamp = timeToTimestamp(getHongKongTime());
   const hkDate = getHongKongDateString();
 
@@ -235,9 +254,10 @@ async function getFilteredPageDailyStats(page, date) {
 }
 
 async function getFilteredWeeklyStats(year, week) {
-  const startOfYear = new Date(year, 0, 1);
-  const startDate = new Date(startOfYear.getTime() + (week - 1) * 7 * 86400000);
-  const endDate = new Date(startDate.getTime() + 6 * 86400000);
+  const jan1 = new Date(year, 0, 1);
+  const dow = jan1.getDay();
+  const startDate = new Date(jan1.getTime() + ((week - 1) * 7 - dow - 1) * 86400000);
+  const endDate = new Date(jan1.getTime() + (week * 7 - dow - 2) * 86400000);
   const start = Math.floor(startDate.getTime() / 1000);
   const end = Math.floor(endDate.getTime() / 1000);
 
@@ -281,7 +301,7 @@ async function migrateFromJson() {
 }
 
 
-async function getDayDetail(dateStr) {
+async function getDayDetail(dateStr, page) {
   const { start, end } = hkDayRange(dateStr);
   const snapshot = await getDb().collection(STATS_COL)
     .where('timestamp', '>=', start)
@@ -295,10 +315,11 @@ async function getDayDetail(dateStr) {
 
   snapshot.forEach(d => {
     const data = d.data();
+    if (page && data.pagePath !== page) return;
     total++;
     users.add(data.userId);
 
-    const hour = new Date(data.timestamp * 1000 + 8 * 3600 * 1000).getHours();
+    const hour = new Date(data.timestamp * 1000 + 8 * 3600 * 1000).getUTCHours();
     hourly[hour] = (hourly[hour] || 0) + 1;
 
     const p = data.pagePath || '/';
@@ -321,10 +342,11 @@ async function getDayDetail(dateStr) {
 }
 
 
-async function getWeekDetail(year, week) {
-  const startOfYear = new Date(year, 0, 1);
-  const startDate = new Date(startOfYear.getTime() + (week - 1) * 7 * 86400000);
-  const endDate = new Date(startDate.getTime() + 6 * 86400000);
+async function getWeekDetail(year, week, page) {
+  const jan1 = new Date(year, 0, 1);
+  const dow = jan1.getDay();
+  const startDate = new Date(jan1.getTime() + ((week - 1) * 7 - dow - 1) * 86400000);
+  const endDate = new Date(jan1.getTime() + (week * 7 - dow - 2) * 86400000);
   const start = Math.floor(startDate.getTime() / 1000);
   const end = Math.floor(endDate.getTime() / 1000);
 
@@ -340,6 +362,7 @@ async function getWeekDetail(year, week) {
 
   snapshot.forEach(d => {
     const data = d.data();
+    if (page && data.pagePath !== page) return;
     total++;
     allUsers.add(data.userId);
 
@@ -368,7 +391,7 @@ async function getWeekDetail(year, week) {
   };
 }
 
-async function getMonthDetail(year, month) {
+async function getMonthDetail(year, month, page) {
   const startDate = new Date(year, month - 1, 1);
   const endDate = new Date(year, month, 0);
   const start = Math.floor(startDate.getTime() / 1000);
@@ -386,6 +409,7 @@ async function getMonthDetail(year, month) {
 
   snapshot.forEach(d => {
     const data = d.data();
+    if (page && data.pagePath !== page) return;
     total++;
     allUsers.add(data.userId);
 
@@ -416,6 +440,8 @@ async function getMonthDetail(year, month) {
 
 export default {
   recordVisit,
+  isMonitoringEnabled,
+  setMonitoringEnabled,
   getTodayStats,
   getPageStats,
   getDailyStats,

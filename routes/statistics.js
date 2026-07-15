@@ -254,9 +254,10 @@ router.get('/api/statistics/export', checkStatsAuth, async (req, res) => {
 
 router.get('/api/statistics/day-detail', checkStatsAuth, async (req, res) => {
   const date = req.query.date;
+  const page = req.query.page || '';
   if (!date) return res.status(400).json({ error: 'date required' });
   try {
-    const detail = await statistics.getDayDetail(date);
+    const detail = await statistics.getDayDetail(date, page);
     res.json(detail);
   } catch (e) {
     console.error('[day-detail] Error:', e);
@@ -268,9 +269,10 @@ router.get('/api/statistics/day-detail', checkStatsAuth, async (req, res) => {
 router.get('/api/statistics/week-detail', checkStatsAuth, async (req, res) => {
   const year = parseInt(req.query.year);
   const week = parseInt(req.query.week);
+  const page = req.query.page || '';
   if (!year || !week) return res.status(400).json({ error: 'year and week required' });
   try {
-    const detail = await statistics.getWeekDetail(year, week);
+    const detail = await statistics.getWeekDetail(year, week, page);
     res.json(detail);
   } catch (e) {
     console.error('[week-detail] Error:', e);
@@ -281,9 +283,10 @@ router.get('/api/statistics/week-detail', checkStatsAuth, async (req, res) => {
 router.get('/api/statistics/month-detail', checkStatsAuth, async (req, res) => {
   const year = parseInt(req.query.year);
   const month = parseInt(req.query.month);
+  const page = req.query.page || '';
   if (!year || !month) return res.status(400).json({ error: 'year and month required' });
   try {
-    const detail = await statistics.getMonthDetail(year, month);
+    const detail = await statistics.getMonthDetail(year, month, page);
     res.json(detail);
   } catch (e) {
     console.error('[month-detail] Error:', e);
@@ -291,4 +294,25 @@ router.get('/api/statistics/month-detail', checkStatsAuth, async (req, res) => {
   }
 });
 
+
+router.get('/api/statistics/monitoring-status', checkStatsAuth, async (req, res) => {
+  try {
+    const enabled = await statistics.isMonitoringEnabled();
+    res.json({ monitoringEnabled: enabled });
+  } catch(e) {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+router.post('/api/statistics/monitoring-toggle', checkStatsAuth, async (req, res) => {
+  try {
+    const current = await statistics.isMonitoringEnabled();
+    await statistics.setMonitoringEnabled(!current);
+    res.json({ monitoringEnabled: !current });
+  } catch(e) {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
 export default router;
+
