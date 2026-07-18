@@ -1,0 +1,118 @@
+ <!DOCTYPE html>
+ <html lang="zh-TW">
+ <head>
+   <meta charset="UTF-8">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <title>進階批次下載</title>
+   <script>window.BASE_PATH = '<%= basePath %>';</script>
+   <link rel="stylesheet" href="<%= basePath %>/styles.css">
+   <style>
+     .advance-container { max-width: 900px; margin: 0 auto; padding: 24px; }
+     .advance-container h1 { font-size: 1.5rem; margin-bottom: 8px; }
+     .advance-container .subtitle { color: #888; margin-bottom: 24px; }
+     .login-section { text-align: center; padding: 60px 20px; }
+     .login-section input {
+       padding: 10px 16px; font-size: 1rem; width: 240px;
+       border: 1px solid #444; border-radius: 6px; background: #1a1a2e; color: #eee;
+     }
+     .login-section button {
+       padding: 10px 24px; font-size: 1rem; margin-left: 8px;
+       background: #e94560; color: white; border: none; border-radius: 6px; cursor: pointer;
+     }
+     .login-error { color: #e94560; margin-top: 12px; }
+     .batch-input {
+       width: 100%; min-height: 200px; padding: 14px; font-size: 0.95rem;
+       border: 1px solid #444; border-radius: 8px; background: #1a1a2e; color: #eee;
+       resize: vertical; font-family: monospace; margin-bottom: 16px;
+     }
+     .options-row {
+       display: flex; gap: 24px; align-items: center; margin-bottom: 20px; flex-wrap: wrap;
+     }
+     .options-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; color: #ccc; }
+     .options-row input[type="checkbox"] { width: 18px; height: 18px; }
+     .post-actions { display: flex; gap: 12px; margin-bottom: 20px; }
+     .post-btn {
+       padding: 10px 20px; border: 2px solid #444; border-radius: 8px;
+       background: transparent; color: #ccc; cursor: pointer; font-size: 0.9rem; transition: all .2s;
+     }
+     .post-btn.active { border-color: #e94560; color: #e94560; background: rgba(233,69,96,0.1); }
+     .start-btn {
+       width: 100%; padding: 14px; font-size: 1.1rem; background: #e94560;
+       color: white; border: none; border-radius: 8px; cursor: pointer; margin-bottom: 24px;
+     }
+     .start-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+     .progress-section { margin-top: 24px; }
+     .progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+     .progress-bar-wrap { height: 8px; background: #2a2a3e; border-radius: 4px; overflow: hidden; margin-bottom: 20px; }
+     .progress-bar-fill { height: 100%; background: #e94560; border-radius: 4px; transition: width .3s; }
+     .video-list { max-height: 400px; overflow-y: auto; }
+     .video-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #2a2a3e; font-size: 0.9rem; }
+     .video-item .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 12px; }
+     .video-item .status { font-size: 0.8rem; min-width: 70px; text-align: right; }
+     .video-item .status.pending { color: #666; }
+     .video-item .status.downloading { color: #e94560; }
+     .video-item .status.completed { color: #4caf50; }
+     .video-item .status.error { color: #ff5722; }
+     .log-section { margin-top: 24px; background: #111; border-radius: 8px; padding: 14px; max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; color: #888; line-height: 1.6; }
+     .result-bar { margin-top: 16px; padding: 16px; background: rgba(76,175,80,0.15); border: 1px solid #4caf50; border-radius: 8px; display: none; }
+     .result-bar.show { display: block; }
+     .result-bar a { color: #4caf50; font-weight: bold; }
+     .hidden { display: none !important; }
+   </style>
+ </head>
+ <body>
+ <div class="advance-container">
+   <a href="<%= basePath %>/" style="color:#888;text-decoration:none;margin-bottom:16px;display:inline-block">← 返回首頁</a>
+   <h1>進階批次下載</h1>
+   <p class="subtitle">貼上影片/播放清單連結（每行一個），自動下載最高畫質 MP4，並可選擇封裝方式。</p>
+ 
+   <!-- Login -->
+   <div id="loginSec" class="login-section">
+     <h2>請輸入密碼</h2>
+     <div>
+       <input type="password" id="pwInput" placeholder="輸入密碼..." autofocus>
+       <button id="loginBtn">登入</button>
+     </div>
+     <p id="loginError" class="login-error hidden"></p>
+   </div>
+ 
+   <!-- Main -->
+   <div id="mainSec" class="hidden">
+     <textarea id="urlInput" class="batch-input" placeholder="貼上一或多個 YouTube 連結（每個一行），也支援播放清單..."></textarea>
+ 
+     <div class="options-row">
+       <label><input type="checkbox" id="subCheck"> 下載字幕（如果有的話）</label>
+     </div>
+ 
+     <p style="color:#ccc;margin-bottom:8px;">下載完成後處理</p>
+     <div class="post-actions" id="postActions">
+       <button class="post-btn active" data-action="video">影片（留在下載目錄）</button>
+       <button class="post-btn" data-action="folder">目錄分類 YYYYMMDDHHmm</button>
+       <button class="post-btn" data-action="zip">壓縮成 ZIP</button>
+     </div>
+ 
+     <button id="startBtn" class="start-btn">開始批次下載</button>
+ 
+     <!-- Progress -->
+     <div id="progressSec" class="progress-section hidden">
+       <div class="progress-header">
+         <span id="progressLabel">準備中...</span>
+         <span id="progressCount">0/0</span>
+       </div>
+       <div class="progress-bar-wrap">
+         <div id="progressFill" class="progress-bar-fill" style="width:0%"></div>
+       </div>
+       <div class="video-list" id="videoList"></div>
+       <div class="log-section" id="logBox"></div>
+     </div>
+ 
+     <!-- Result -->
+     <div id="resultBar" class="result-bar">
+       <span id="resultText"></span>
+       <a id="resultLink" href="#" style="margin-left:12px;">下載</a>
+     </div>
+   </div>
+ </div>
+ <script src="<%= basePath %>/advance.js"></script>
+ </body>
+ </html>

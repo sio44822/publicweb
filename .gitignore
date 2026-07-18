@@ -11,3 +11,5 @@ logs/
 data/
 .vercel
 api/node_modules
+/tools/downloadyt/
+/cookies/

@@ -4,7 +4,12 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import routes from './routes/index.js';
 import { fileURLToPath } from 'url';
-import path from 'path';
+ import path from 'path';
+ import fs from 'fs';
+ import downloadytApiRoutes from './routes/downloadyt/api.js';
+ import downloadytAdvanceRoutes from './routes/downloadyt/advance.js';
+ import { initCleanup as initDownloadytCleanup } from './services/downloadyt/cleanup.js';
+ import { checkDownloader } from './services/downloadyt/downloader.js';
 
 // ESM 沒有 __filename / __dirname，需從 import.meta.url 手動取得
 const __filename = fileURLToPath(import.meta.url);
@@ -26,7 +31,40 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // 掛載所有路由
-app.use(routes);
+ app.use(routes);
+ 
+ // ===== DownloadYT 功能整合 =====
+ 
+ // 確保目錄存在
+ ['temp', 'public/downloadyt/downloads', 'cookies/downloadyt'].forEach(dir => {
+   const dirPath = path.join(__dirname, dir);
+   if (!fs.existsSync(dirPath)) {
+     fs.mkdirSync(dirPath, { recursive: true });
+   }
+ });
+ 
+ // DownloadYT 頁面路由（放在靜態檔案前，避免衝突）
+ app.get('/downloadyt', (req, res) => {
+   res.render('downloadyt/index', { basePath: '/downloadyt', port: PORT });
+ });
+ app.get('/downloadyt/advance', (req, res) => {
+   res.render('downloadyt/advance', { basePath: '/downloadyt', port: PORT });
+ });
+ 
+ // DownloadYT 靜態檔案
+ app.use('/downloadyt', express.static(path.join(__dirname, 'public', 'downloadyt')));
+ 
+ // DownloadYT API 路由
+ app.use('/downloadyt/api', downloadytApiRoutes);
+ app.use('/downloadyt/api/advance', downloadytAdvanceRoutes);
+ 
+ // 啟動清理排程
+ initDownloadytCleanup();
+ 
+ // 啟動時檢查下載器狀態
+ checkDownloader().then(ready => {
+   console.log(`[DownloadYT] Downloader ready: ${ready}`);
+ });
 
 // 匯出 Express app 供 Vercel Serverless Runtime 使用
 export default app;
