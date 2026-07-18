@@ -1,7 +1,10 @@
-import express from 'express';
-import { v4 as uuidv4 } from 'uuid';
+﻿import express from 'express';
+import courserservationRoutes from './coursereservation/index.js';
+import couponRoutes from './coupon/index.js';
+import urlQrDocToolRoutes from './url-qr-doc-tool/index.js';
 import db from '../utils/db/index.js';
 import statisticsRoutes from './statistics.js';
+import { getUserId, getNavServices } from './_helpers.js';
 
 const router = express.Router();
 
@@ -17,32 +20,19 @@ const URLBASE = isDev
  * 取得或建立訪客唯一 ID（寫入 Cookie，有效期一年）。
  * 用於訪問統計時區分不同使用者。
  */
-function getUserId(req, res) {
-  let userId = req.cookies.coupon_user_id;
-  if (!userId) {
-    userId = uuidv4();
-    res.cookie('coupon_user_id', userId, {
-      maxAge: 365 * 24 * 60 * 60 * 1000,
-      httpOnly: true
-    });
-  }
-  return userId;
-}
 
 /**
  * 取得導覽列的服務清單。
  * 僅回傳已啟用且 currentService 有設定 showInNav 的服務。
  */
-async function getNavServices(currentPath) {
-  const services = await db.services.getEnabled();
-  const currentService = services.find(s => s.url === currentPath);
-  // 若當前服務不存在或被設定為不顯示於導覽列，則不顯示任何導覽項目
-  if (!currentService || currentService.showInNav === false) return [];
-  return services.map(s => ({ id: s.id, name: s.name, url: s.url, icon: s.icon }));
-}
 
 // 掛載統計相關路由（含 /statistics、/api/stats/* 等）
 router.use(statisticsRoutes);
+
+// ==== 獨立工具路由 ====
+router.use(courserservationRoutes);
+router.use(couponRoutes);
+router.use(urlQrDocToolRoutes);
 
 // 提供前端所需的環境設定（base URL、運行模式）
 router.get('/config', (req, res) => {
@@ -67,45 +57,15 @@ router.get('/services', (req, res) => {
  * 課程預約頁面。
  * 記錄訪客造訪行為後，取得導覽列服務清單並渲染頁面。
  */
-router.get('/public/coursereservation', async (req, res) => {
-  const userId = getUserId(req, res);
-  try {
-    await db.statistics.recordVisit(userId, '/public/coursereservation');
-  } catch (e) {
-    console.error('[recordVisit] coursereservation error:', e.message);
-  }
-  const navServices = await getNavServices('/public/coursereservation');
-  res.render('coursereservation', { navServices, currentPath: '/public/coursereservation' });
-});
 
 /**
  * 優惠券頁面。
  * 流程同上：記錄造訪 → 取導覽列 → 渲染頁面。
  */
-router.get('/public/coupon', async (req, res) => {
-  const userId = getUserId(req, res);
-  try {
-    await db.statistics.recordVisit(userId, '/public/coupon');
-  } catch (e) {
-    console.error('[recordVisit] coupon error:', e.message);
-  }
-  const navServices = await getNavServices('/public/coupon');
-  res.render('coupon', { navServices, currentPath: '/public/coupon' });
-});
 
 /**
  * URL 轉 QR Code 文檔工具頁面。
  */
-router.get('/public/url-qr-doc-tool', async (req, res) => {
-  const userId = getUserId(req, res);
-  try {
-    await db.statistics.recordVisit(userId, '/public/url-qr-doc-tool');
-  } catch (e) {
-    console.error('[recordVisit] url-qr-doc-tool error:', e.message);
-  }
-  const navServices = await getNavServices('/public/url-qr-doc-tool');
-  res.render('url-qr-doc-tool', { navServices, currentPath: '/public/url-qr-doc-tool' });
-});
 
 // ======================== 管理後台頁面 ========================
 
@@ -424,10 +384,17 @@ setTimeout(() => {
 router.post('/api/services/verify-advanced', (req, res) => {
   const { password } = req.body;
   if (password === ADMIN_PASSWORD) {
-    res.cookie('show_advanced', 'true', { maxAge: 30 * 24 * 60 * 60 * 1000, httpOnly: true });
+    res.cookie('show_advanced', 'true', { maxAge: 30 * 24 * 60 * 60 * 1000, httpOnly: false });
     return res.json({ ok: true });
   }
   res.status(401).json({ error: 'Invalid password' });
+});
+
+
+// 清除進階模式 Cookie\
+router.post('/api/services/clear-advanced', (req, res) => {
+  res.clearCookie('show_advanced');
+  res.json({ ok: true });
 });
 
 export default router;

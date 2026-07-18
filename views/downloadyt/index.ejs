@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+﻿ <!DOCTYPE html>
  <html lang="zh-TW">
  <head>
    <meta charset="UTF-8">
@@ -38,8 +38,19 @@
      .modal-close { position: absolute; top: 16px; right: 20px; background: none; border: none; color: #888; font-size: 1.5rem; cursor: pointer; }
      .modal-close:hover { color: #e94560; }
      .help-btn { background: none; border: 1px solid #555; color: #888; padding: 4px 14px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; transition: all .2s; }
-     .help-btn:hover { border-color: #e94560; color: #e94560; }
-   </style>
+    .help-btn:hover { border-color: #e94560; color: #e94560; }
+     .instruction-section {
+       text-align: center;
+       margin: 16px auto 24px;
+       max-width: 100%;
+     }
+     .instruction-image {
+       max-width: 100%;
+       height: auto;
+       border-radius: 10px;
+       box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+     }
+  </style>
  </head>
  <body>
    <div class="container">
@@ -56,9 +67,14 @@
      <main>
        <div class="search-box">
          <input type="text" id="videoUrl" placeholder="貼上 YouTube 影片連結，按 Enter 自動分析..." autofocus />
-       </div>
+        </div>
+  
+        <!-- 使用說明圖片 -->
+        <div class="instruction-section">
+           <img src="<%= basePath %>/說明.png" alt="使用說明" class="instruction-image" />
+         </div>
  
-       <div id="loading" class="hidden">
+        <div id="loading" class="hidden">
          <div class="spinner"></div>
          <p>正在分析...</p>
        </div>
@@ -125,19 +141,19 @@
        <h2>API 使用說明</h2>
        <h3>直接下載 API</h3>
        <p>直接透過瀏覽器或程式獲取影片/音訊串流，無需選擇格式，自動下載最高畫質。</p>
-       <pre>影片 MP4：<br>http://伺服器IP:<%= port %>/downloadyt/api/direct/video?url=<mark>YouTube連結</mark>
+       <pre>影片 MP4：<br>http://伺服器IP:<%= port %>/public/downloadyt/api/direct/video?url=<mark>YouTube連結</mark>
  
- 音樂 M4A：<br>http://伺服器IP:<%= port %>/downloadyt/api/direct/music?url=<mark>YouTube連結</mark></pre>
+ 音樂 M4A：<br>http://伺服器IP:<%= port %>/public/downloadyt/api/direct/music?url=<mark>YouTube連結</mark></pre>
        <p>影片預設下載最高畫質 MP4 並自動合併音軌，音樂則為最高品質 M4A。</p>
        <h3>cURL 範例</h3>
        <pre># 下載 MP4
- curl -o video.mp4 "http://伺服器IP:<%= port %>/downloadyt/api/direct/video?url=https://youtu.be/jNQXAC9IVRw"
+ curl -o video.mp4 "http://伺服器IP:<%= port %>/public/downloadyt/api/direct/video?url=https://youtu.be/jNQXAC9IVRw"
  
  # 下載 M4A
- curl -o audio.m4a "http://伺服器IP:<%= port %>/downloadyt/api/direct/music?url=https://youtu.be/jNQXAC9IVRw"</pre>
+ curl -o audio.m4a "http://伺服器IP:<%= port %>/public/downloadyt/api/direct/music?url=https://youtu.be/jNQXAC9IVRw"</pre>
        <h3>Python 範例</h3>
        <pre>import requests
- url = "http://伺服器IP:<%= port %>/downloadyt/api/direct/video"
+ url = "http://伺服器IP:<%= port %>/public/downloadyt/api/direct/video"
  params = {"url": "https://youtu.be/jNQXAC9IVRw"}
  r = requests.get(url, params=params, stream=True)
  filename = r.headers.get("Content-Disposition", "").split("filename*=UTF-8''")[-1] or "video.mp4"
@@ -147,10 +163,10 @@
  print(f"下載完成: {filename}")</pre>
        <h3>JavaScript 範例</h3>
        <pre>// 直接觸發瀏覽器下載
- window.location.href = "http://伺服器IP:<%= port %>/downloadyt/api/direct/video?url=https://youtu.be/jNQXAC9IVRw";
+ window.location.href = "http://伺服器IP:<%= port %>/public/downloadyt/api/direct/video?url=https://youtu.be/jNQXAC9IVRw";
  
  // 非同步 fetch
- const res = await fetch("/downloadyt/api/direct/video?url=https://youtu.be/jNQXAC9IVRw");
+ const res = await fetch("/public/downloadyt/api/direct/video?url=https://youtu.be/jNQXAC9IVRw");
  const blob = await res.blob();
  const a = document.createElement("a");
  a.href = URL.createObjectURL(blob);
@@ -158,7 +174,7 @@
  a.click();</pre>
        <h3>進階「選格式」API：</h3>
        <pre># 先獲取可用格式列表
- curl -X POST http://伺服器IP:<%= port %>/downloadyt/api/formats \
+ curl -X POST http://伺服器IP:<%= port %>/public/downloadyt/api/formats \
    -H "Content-Type: application/json" \
    -d '{"url":"https://youtu.be/jNQXAC9IVRw"}'</pre>
      </div>

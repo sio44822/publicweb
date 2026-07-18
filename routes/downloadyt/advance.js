@@ -1,4 +1,4 @@
- /**
+﻿ /**
   * Advance routes — password-gated batch download with post-processing
   */
  import { fileURLToPath } from 'url';
@@ -85,7 +85,7 @@
    const rows = allFiles.map((f, i) => {
      const relPath = path.relative(DOWNLOAD_DIR, path.join(folderPath, f));
      const size = (fs.statSync(path.join(folderPath, f)).size / 1024 / 1024).toFixed(1);
-     return `<tr><td>${i+1}</td><td>${f}</td><td>${size} MB</td><td><a href="/downloadyt/api/advance/file?path=${encodeURIComponent(relPath)}">下載</a></td></tr>`;
+     return `<tr><td>${i+1}</td><td>${f}</td><td>${size} MB</td><td><a href="/public/downloadyt/api/advance/file?path=${encodeURIComponent(relPath)}">下載</a></td></tr>`;
    }).join('');
  
    const html = `<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>${req.params.folderName}</title>
@@ -98,7 +98,7 @@
  <a href="javascript:history.back()" style="color:#888">← 返回</a>
  <h2>${req.params.folderName}</h2>
  <p class="info">${allFiles.length} 個檔案，點擊名稱下載</p>
- <a class="zip-btn" href="/downloadyt/api/advance/download-zip/${encodeURIComponent(req.params.folderName)}">下載全部 ZIP</a>
+ <a class="zip-btn" href="/public/downloadyt/api/advance/download-zip/${encodeURIComponent(req.params.folderName)}">下載全部 ZIP</a>
  <table><thead><tr><th>#</th><th>檔案</th><th>大小</th><th></th></tr></thead><tbody>${rows}</tbody></table>
  </body></html>`;
    res.send(html);
@@ -148,7 +148,7 @@
  
    if (batch.resultType === 'folder' && batch.resultPath && fs.existsSync(batch.resultPath)) {
      const folderName = batch.resultName || 'download';
-     return res.redirect(`/downloadyt/api/advance/browse/${encodeURIComponent(folderName)}`);
+     return res.redirect(`/public/downloadyt/api/advance/browse/${encodeURIComponent(folderName)}`);
    }
  
    if (batch.resultType === 'video' && batch.resultPaths && batch.resultPaths.length > 0) {
@@ -160,7 +160,7 @@
        return res.status(404).json({ success: false, detail: '沒有下載檔案' });
      }
      const fileList = files.map(f =>
-       `{name:${JSON.stringify(f)},url:"/downloadyt/api/advance/file?path=${encodeURIComponent(f)}"}`
+       `{name:${JSON.stringify(f)},url:"/public/downloadyt/api/advance/file?path=${encodeURIComponent(f)}"}`
      ).join(',\n    ');
      const html = `<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8"><title>下載檔案</title>
  <style>body{font-family:sans-serif;max-width:600px;margin:60px auto;background:#111;color:#eee;text-align:center}

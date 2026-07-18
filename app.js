@@ -44,19 +44,19 @@ app.use(express.static(path.join(__dirname, 'public')));
  });
  
  // DownloadYT 頁面路由（放在靜態檔案前，避免衝突）
- app.get('/downloadyt', (req, res) => {
-   res.render('downloadyt/index', { basePath: '/downloadyt', port: PORT });
+ app.get('/public/downloadyt', (req, res) => {
+   res.render('downloadyt/index', { basePath: '/public/downloadyt', port: PORT });
  });
- app.get('/downloadyt/advance', (req, res) => {
-   res.render('downloadyt/advance', { basePath: '/downloadyt', port: PORT });
+ app.get('/public/downloadyt/advance', (req, res) => {
+   res.render('downloadyt/advance', { basePath: '/public/downloadyt', port: PORT });
  });
  
  // DownloadYT 靜態檔案
- app.use('/downloadyt', express.static(path.join(__dirname, 'public', 'downloadyt')));
+ app.use('/public/downloadyt', express.static(path.join(__dirname, 'public', 'downloadyt')));
  
  // DownloadYT API 路由
- app.use('/downloadyt/api', downloadytApiRoutes);
- app.use('/downloadyt/api/advance', downloadytAdvanceRoutes);
+ app.use('/public/downloadyt/api', downloadytApiRoutes);
+ app.use('/public/downloadyt/api/advance', downloadytAdvanceRoutes);
  
  // 啟動清理排程
  initDownloadytCleanup();
