@@ -36,12 +36,14 @@ app.use(express.static(path.join(__dirname, 'public')));
  // ===== DownloadYT 功能整合 =====
  
  // 確保目錄存在
+ if (!process.env.VERCEL) {
  ['temp', 'public/downloadyt/downloads', 'cookies/downloadyt'].forEach(dir => {
    const dirPath = path.join(__dirname, dir);
    if (!fs.existsSync(dirPath)) {
      fs.mkdirSync(dirPath, { recursive: true });
    }
  });
+ }
  
  // DownloadYT 頁面路由（放在靜態檔案前，避免衝突）
  app.get('/public/downloadyt', (req, res) => {
@@ -59,12 +61,14 @@ app.use(express.static(path.join(__dirname, 'public')));
  app.use('/public/downloadyt/api/advance', downloadytAdvanceRoutes);
  
  // 啟動清理排程
+ if (!process.env.VERCEL) {
  initDownloadytCleanup();
  
  // 啟動時檢查下載器狀態
  checkDownloader().then(ready => {
    console.log(`[DownloadYT] Downloader ready: ${ready}`);
  });
+ }
 
 // 匯出 Express app 供 Vercel Serverless Runtime 使用
 export default app;
