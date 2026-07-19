@@ -1,6 +1,7 @@
 ﻿// 載入 .env 環境變數（必須在其他模組之前）
 import 'dotenv/config';
 import express from 'express';
+import http from 'http';
 import cookieParser from 'cookie-parser';
 import routes from './routes/index.js';
 import { fileURLToPath } from 'url';
@@ -10,6 +11,8 @@ import { fileURLToPath } from 'url';
  import downloadytAdvanceRoutes from './routes/downloadyt/advance.js';
  import { initCleanup as initDownloadytCleanup } from './services/downloadyt/cleanup.js';
  import { checkDownloader } from './services/downloadyt/downloader.js';
+import sendcontentRoutes from './routes/sendcontent/index.js';
+import { initSendContentSocket } from './services/sendcontent/socket.js';
 
 // ESM 沒有 __filename / __dirname，需從 import.meta.url 手動取得
 const __filename = fileURLToPath(import.meta.url);
@@ -69,6 +72,17 @@ app.use(express.static(path.join(__dirname, 'public')));
    console.log(`[DownloadYT] Downloader ready: ${ready}`);
  });
  }
+
+// SendContent 頁面路由
+app.get('/public/sendcontent', (req, res) => {
+  res.render('sendcontent/index', { basePath: '/public/sendcontent' });
+});
+
+// SendContent 靜態檔案
+app.use('/public/sendcontent', express.static(path.join(__dirname, 'public', 'sendcontent')));
+
+// SendContent API 路由
+app.use('/public/sendcontent', sendcontentRoutes);
 
 // 匯出 Express app 供 Vercel Serverless Runtime 使用
 export default app;

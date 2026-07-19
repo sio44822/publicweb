@@ -1,0 +1,70 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SendContent</title>
+  <script>window.BASE_PATH = '<%= basePath %>';</script>
+  <link rel="stylesheet" href="<%= basePath %>/css/style.css">
+</head>
+<body>
+  <div class="container">
+    <h1>SendContent</h1>
+    <h2>-文字/檔案皆不會儲存在伺服器-</h2>
+    
+    <div id="connect-section" class="section">
+      <div id="qr-section">
+        <h2>房間資訊</h2>
+        <div id="qrcode"></div>
+        <p class="code-display">你的房間號: <span id="room-code">---</span></p>
+      </div>
+      
+      <div class="divider">或</div>
+      
+      <div id="input-section">
+        <h3>輸入房間號</h3>
+        <input type="text" id="code-input" maxlength="4" placeholder="四位數">
+        <button id="join-btn" class="btn primary">加入房間</button>
+      </div>
+      
+      <p id="status" class="status waiting">等待配對中...</p>
+    </div>
+
+    <div id="app-section" class="section hidden">
+      <div class="room-info">
+        <span>你的房間號: </span><span id="current-room-code">---</span>
+        <button id="back-home-btn" class="btn secondary" style="margin-left: 12px; padding: 4px 12px; font-size: 12px;">返回首頁</button>
+      </div>
+      
+      <div class="panel send-panel">
+        <h2>傳送區</h2>
+        <div class="tabs">
+          <button class="tab active" data-tab="text">文字</button>
+          <button class="tab" data-tab="file">檔案</button>
+        </div>
+        
+        <div class="tab-content active" id="text-tab">
+          <textarea id="message-input" placeholder="輸入文字..."></textarea>
+          <button id="send-text-btn" class="btn primary">傳送</button>
+        </div>
+        
+        <div class="tab-content" id="file-tab">
+          <input type="file" id="file-input" multiple>
+          <div id="selected-files"></div>
+          <button id="send-file-btn" class="btn primary">上傳並傳送</button>
+        </div>
+      </div>
+
+      <div class="panel receive-panel">
+        <h2>接收區</h2>
+        <div id="received-list">
+          <p class="empty-msg">尚無收到訊息</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="<%= basePath %>/socket.io/socket.io.js"></script>
+  <script src="<%= basePath %>/js/client.js"></script>
+</body>
+</html>
